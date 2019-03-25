@@ -129,6 +129,7 @@ const StructureRepresentation3D = PluginStateTransform.BuiltIn({
 
         if (!a) {
             return {
+            return {
                 type: PD.Mapped<any>(
                     registry.default.name,
                     registry.types,

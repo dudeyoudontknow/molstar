@@ -19,10 +19,8 @@ import { LoadParams, SupportedFormats, RepresentationStyle, ModelInfo } from './
 import { RxEventHelper } from 'mol-util/rx-event-helper';
 import { ControlsWrapper } from './ui/controls';
 import { PluginState } from 'mol-plugin/state';
-import { Canvas3D } from 'mol-canvas3d/canvas3d';
-require('mol-plugin/skin/light.scss')
-
-
+//import { Canvas3D } from 'mol-canvas3d/canvas3d';
+import {OrderedSet} from 'immutable';
 
 class MolStarPLYWrapper {
     static VERSION_MAJOR = 2;
@@ -60,11 +58,16 @@ class MolStarPLYWrapper {
         return this.plugin.state.dataState;
     }
 
-    get klick(){
+    get click(){
     this.plugin.canvas3d.interaction.click.subscribe(e =>{
-          console.log('atomID', e)
-            aminoAcid = 169;
-        })
+          console.log('atomID', e.current.loci);
+          let atomID = 196;
+          const structure = this.getObj<PluginStateObject.Molecule.Structure>('asm');
+          aminoAcid = structure.units[0].residueIndex[structure.units[0].elements[atomID]]-1;
+
+          console.log('Aminoacid:',aminoAcid)
+          console.log(OrderedSet.fromKeys(e.current.loci));
+        });
         return 0
     }
 
@@ -77,7 +80,6 @@ class MolStarPLYWrapper {
         const parsed = format === 'cif'
             ? b.apply(StateTransforms.Data.ParseCif).apply(StateTransforms.Model.TrajectoryFromMmCif)
             : b.apply(StateTransforms.Model.TrajectoryFromPDB);
-
         return parsed
             .apply(StateTransforms.Model.ModelFromTrajectory, { modelIndex: 0 }, { ref: 'model' });
     }
@@ -98,6 +100,8 @@ class MolStarPLYWrapper {
 
     private visual(ref: string, style?: RepresentationStyle) {
         const structure = this.getObj<PluginStateObject.Molecule.Structure>(ref);
+        number_of_atoms = structure.units[0].elements.length;  // global variable in index.html
+        console.log(structure)
         if (!structure) return;
 
         const root = this.state.build().to(ref);
