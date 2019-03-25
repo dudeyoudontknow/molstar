@@ -24,6 +24,10 @@ import { OrderedSet } from 'mol-data/int';
 import { ShapeGroup } from 'mol-model/shape';
 
 class MolStarPLYWrapper {
+    constructor() {
+        this.initClick()
+    }
+
     static VERSION_MAJOR = 2;
     static VERSION_MINOR = 0;
 
@@ -56,11 +60,7 @@ class MolStarPLYWrapper {
         this.plugin.customModelProperties.register(EvolutionaryConservation.propertyProvider);
     }
 
-    get state() {
-        return this.plugin.state.dataState;
-    }
-
-    get click() {
+    private initClick() {
         this.plugin.canvas3d.interaction.click.subscribe(e => {
             const loci = e.current.loci
             if (!ShapeGroup.isLoci(loci)) return // ignore non-shape loci
@@ -69,6 +69,7 @@ class MolStarPLYWrapper {
             // use the model to related the atomID because the atomID is best viewed as a model property and
             // not as a structure property (a structure can be build from multiple models)
             const model = this.getObj<PluginStateObject.Molecule.Model>('model');
+            if (!model) return // handle missing model case
 
             // assume the atomID is an index starting from 1
             const atomIndex = atomID - 1
@@ -84,9 +85,11 @@ class MolStarPLYWrapper {
 
             this.events.residueInfo.next({ residueNumber, residueName, chainName })
         });
-        return 0
     }
 
+    get state() {
+        return this.plugin.state.dataState;
+    }
 
     private download(b: StateBuilder.To<PSO.Root>, url: string) {
         return b.apply(StateTransforms.Data.Download, { url, isBinary: false })
