@@ -238,7 +238,7 @@ interface IsConnectedToCtx {
 function checkConnected(ctx: IsConnectedToCtx, structure: Structure) {
     const { queryCtx, input, target, bondTest, tElement } = ctx;
 
-    const interLinks = input.links;
+    const interLinks = input.interUnitLinks;
     for (const unit of structure.units) {
         if (!Unit.isAtomic(unit)) continue;
 

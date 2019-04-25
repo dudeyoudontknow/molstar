@@ -68,7 +68,7 @@ namespace Link {
             if (idx < 0) return LinkType.create(LinkType.Flag.None);
             return LinkType.create(links.edgeProps.flags[idx]);
         } else {
-            const bond = structure.links.getBondFromLocation(link);
+            const bond = structure.interUnitLinks.getBondFromLocation(link);
             if (bond) return LinkType.create(bond.flag);
             return LinkType.create(LinkType.Flag.None);
         }
@@ -81,7 +81,7 @@ namespace Link {
             if (idx < 0) return 0;
             return links.edgeProps.order[idx];
         } else {
-            const bond = structure.links.getBondFromLocation(link);
+            const bond = structure.interUnitLinks.getBondFromLocation(link);
             if (bond) return bond.order;
             return 0;
         }

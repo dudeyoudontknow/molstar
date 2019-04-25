@@ -159,7 +159,7 @@ class Structure {
         return this._props.lookup3d;
     }
 
-    get links() {
+    get interUnitLinks() {
         if (this._props.links) return this._props.links;
         this._props.links = computeInterUnitBonds(this);
         return this._props.links;

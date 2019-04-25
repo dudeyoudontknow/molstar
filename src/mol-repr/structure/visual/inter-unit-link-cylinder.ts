@@ -20,7 +20,7 @@ import { VisualContext } from 'mol-repr/visual';
 import { Theme } from 'mol-theme/theme';
 
 function createInterUnitLinkCylinderMesh(ctx: VisualContext, structure: Structure, theme: Theme, props: PD.Values<InterUnitLinkParams>, mesh?: Mesh) {
-    const links = structure.links
+    const links = structure.interUnitLinks
     const { bondCount, bonds } = links
     const { sizeFactor, sizeAspectRatio } = props
 
@@ -80,7 +80,7 @@ export function InterUnitLinkVisual(materialId: number): ComplexVisual<InterUnit
 function getLinkLoci(pickingId: PickingId, structure: Structure, id: number) {
     const { objectId, groupId } = pickingId
     if (id === objectId) {
-        const bond = structure.links.bonds[groupId]
+        const bond = structure.interUnitLinks.bonds[groupId]
         return Link.Loci(structure, [
             Link.Location(
                 bond.unitA, bond.indexA as StructureElement.UnitIndex,
@@ -100,7 +100,7 @@ function eachLink(loci: Loci, structure: Structure, apply: (interval: Interval) 
     if (Link.isLoci(loci)) {
         if (!Structure.areEquivalent(loci.structure, structure)) return false
         for (const b of loci.links) {
-            const idx = structure.links.getBondIndex(b.aIndex, b.aUnit, b.bIndex, b.bUnit)
+            const idx = structure.interUnitLinks.getBondIndex(b.aIndex, b.aUnit, b.bIndex, b.bUnit)
             if (idx !== -1) {
                 if (apply(Interval.ofSingleton(idx))) changed = true
             }
@@ -110,7 +110,7 @@ function eachLink(loci: Loci, structure: Structure, apply: (interval: Interval) 
         // TODO mark link only when both of the link elements are in a StructureElement.Loci
         for (const e of loci.elements) {
             OrderedSet.forEach(e.indices, v => {
-                const indices = structure.links.getBondIndices(v, e.unit)
+                const indices = structure.interUnitLinks.getBondIndices(v, e.unit)
                 for (let i = 0, il = indices.length; i < il; ++i) {
                     if (apply(Interval.ofSingleton(indices[i]))) changed = true
                 }
