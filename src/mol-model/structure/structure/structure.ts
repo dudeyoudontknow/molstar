@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2017-2018 mol* contributors, licensed under MIT, See LICENSE file for more info.
+ * Copyright (c) 2017-2019 mol* contributors, licensed under MIT, See LICENSE file for more info.
  *
  * @author David Sehnal <david.sehnal@gmail.com>
  * @author Alexander Rose <alexander.rose@weirdbyte.de>
@@ -15,7 +15,7 @@ import Unit from './unit'
 import { StructureLookup3D } from './util/lookup3d';
 import { CoarseElements } from '../model/properties/coarse';
 import { StructureSubsetBuilder } from './util/subset-builder';
-import { InterUnitBonds, computeInterUnitBonds } from './unit/links';
+import { InterUnitBonds, computeInterUnitBonds, Link } from './unit/links';
 import { PairRestraints, CrossLinkRestraint, extractCrossLinkRestraints } from './unit/pair-restraints';
 import StructureSymmetry from './symmetry';
 import StructureProperties from './properties';
@@ -49,6 +49,7 @@ class Structure {
         hashCode: number,
         /** Hash based on all unit.id values in the structure, reflecting the units transformation */
         transformHash: number,
+        linkCount: number,
         elementCount: number,
         polymerResidueCount: number,
         coordinateSystem: SymmetryOperator,
@@ -57,6 +58,7 @@ class Structure {
     } = {
         hashCode: -1,
         transformHash: -1,
+        linkCount: 0,
         elementCount: 0,
         polymerResidueCount: 0,
         coordinateSystem: SymmetryOperator.Default
@@ -66,9 +68,22 @@ class Structure {
         return new StructureSubsetBuilder(this, isSorted);
     }
 
+    /** Count of all links (intra- and inter-unit) in the structure */
+    get linkCount() {
+        if (!this._props.linkCount) {
+            this._props.linkCount = this.interUnitLinks.bondCount + Link.getIntraUnitLinkCount(this)
+        }
+        return this._props.linkCount;
+    }
+
     /** Count of all elements in the structure, i.e. the sum of the elements in the units */
     get elementCount() {
         return this._props.elementCount;
+    }
+
+    /** Count of all polymer residues in the structure */
+    get polymerResidueCount() {
+        return this._props.polymerResidueCount;
     }
 
     get hasCustomProperties() {
@@ -94,12 +109,6 @@ class Structure {
     get inheritedPropertyData() {
         return this.parent ? this.parent.currentPropertyData : this.currentPropertyData;
     }
-
-    /** Count of all polymer residues in the structure */
-    get polymerResidueCount() {
-        return this._props.polymerResidueCount;
-    }
-
     /** Coarse structure, defined as Containing less than twice as many elements as polymer residues */
     get isCoarse() {
         const ec = this.elementCount
@@ -219,6 +228,7 @@ class Structure {
 
     private initUnits(units: ArrayLike<Unit>) {
         const map = IntMap.Mutable<Unit>();
+        let linkCount = 0;
         let elementCount = 0;
         let polymerResidueCount = 0;
         let isSorted = true;
@@ -232,6 +242,7 @@ class Structure {
             lastId = u.id;
         }
         if (!isSorted) sort(units, 0, units.length, cmpUnits, arraySwap);
+        this._props.linkCount = linkCount;
         this._props.elementCount = elementCount;
         this._props.polymerResidueCount = polymerResidueCount;
         return map;
