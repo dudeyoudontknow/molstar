@@ -16,6 +16,7 @@ import { MolecularSurfaceRepresentationProvider } from 'mol-repr/structure/repre
 import { BallAndStickRepresentationProvider } from 'mol-repr/structure/representation/ball-and-stick';
 import { GaussianSurfaceRepresentationProvider } from 'mol-repr/structure/representation/gaussian-surface';
 import { ComputedSecondaryStructure } from 'mol-model-props/computed/secondary-structure';
+import { ComputedValenceModel } from 'mol-model-props/computed/valence-model';
 
 const parent = document.getElementById('app')!
 parent.style.width = '100%'
@@ -81,13 +82,18 @@ async function init() {
     const models = await getModels(cif)
     const structure = await getStructure(models[0])
     console.time('computeDSSP')
-    await ComputedSecondaryStructure.attachFromCifOrCompute(structure)
+    // await ComputedSecondaryStructure.attachFromCifOrCompute(structure)
     console.timeEnd('computeDSSP');
 
+    console.time('computeValenceModel')
+    await ComputedValenceModel.attachFromCifOrCompute(structure)
+    console.timeEnd('computeValenceModel');
+    console.log(ComputedValenceModel.get(structure))
+
     const show = {
-        cartoon: false,
-        ballAndStick: true,
-        molecularSurface: true,
+        cartoon: true,
+        ballAndStick: false,
+        molecularSurface: false,
         gaussianSurface: false,
     }
 
