@@ -5,6 +5,7 @@
  */
 
 import { ElementSymbol } from '../../types';
+import { AtomNumber } from './measures';
 
 /**
  * Enum of element symbols
@@ -20,13 +21,13 @@ export const AlkalineEarthMetals = new Set<ElementSymbol>([ 'BE', 'MG', 'CA', 'S
 export function isAlkalineEarthMetal(element: ElementSymbol) { return AlkalineEarthMetals.has(element) }
 
 export const PolyatomicNonmetals = new Set<ElementSymbol>([ 'C', 'P', 'S', 'SE' ] as ElementSymbol[])
-export function isPolyatomicNonmetals(element: ElementSymbol) { return PolyatomicNonmetals.has(element) }
+export function isPolyatomicNonmetal(element: ElementSymbol) { return PolyatomicNonmetals.has(element) }
 
 export const DiatomicNonmetals = new Set<ElementSymbol>([ 'H', 'N', 'O', 'F', 'CL', 'BR', 'I' ] as ElementSymbol[])
 export function isDiatomicNonmetal(element: ElementSymbol) { return DiatomicNonmetals.has(element) }
 
 export const NobleGases = new Set<ElementSymbol>([ 'HE', 'NE', 'AR', 'KR', 'XE', 'RN' ] as ElementSymbol[])
-export function isNobleGases(element: ElementSymbol) { return NobleGases.has(element) }
+export function isNobleGas(element: ElementSymbol) { return NobleGases.has(element) }
 
 export const PostTransitionMetals = new Set<ElementSymbol>([ 'ZN', 'GA', 'CD', 'IN', 'SN', 'HG', 'TI', 'PB', 'BI', 'PO', 'CN' ] as ElementSymbol[])
 export function isPostTransitionMetal(element: ElementSymbol) { return PostTransitionMetals.has(element) }
@@ -36,3 +37,42 @@ export function isMetalloid(element: ElementSymbol) { return Metalloids.has(elem
 
 export const Halogens = new Set<ElementSymbol>([ 'F', 'CL', 'BR', 'I', 'AT' ] as ElementSymbol[])
 export function isHalogen(element: ElementSymbol) { return Halogens.has(element) }
+
+export function isTransitionMetal(element: ElementSymbol) {
+    const no = AtomNumber(element)
+    return (
+        (no >= 21 && no <= 29) ||
+        (no >= 39 && no <= 47) ||
+        (no >= 72 && no <= 79) ||
+        (no >= 104 && no <= 108)
+    )
+}
+
+export function isLanthanide (element: ElementSymbol) {
+    const no = AtomNumber(element)
+    return no >= 57 && no <= 71
+}
+
+export function isActinide (element: ElementSymbol) {
+    const no = AtomNumber(element)
+    return no >= 89 && no <= 103
+}
+
+export function isMetal(element: ElementSymbol) {
+    return (
+        isAlkaliMetal(element) ||
+        isAlkalineEarthMetal(element) ||
+        isLanthanide(element) ||
+        isActinide(element) ||
+        isTransitionMetal(element) ||
+        isPostTransitionMetal(element)
+    )
+}
+
+export function isNonmetal(element: ElementSymbol) {
+    return (
+        isDiatomicNonmetal(element) ||
+        isPolyatomicNonmetal(element) ||
+        isNobleGas(element)
+    )
+}
