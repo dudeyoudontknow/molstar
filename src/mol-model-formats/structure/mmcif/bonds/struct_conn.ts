@@ -11,7 +11,7 @@ import { LinkType } from 'mol-model/structure/model/types'
 import { findEntityIdByAsymId, findAtomIndexByLabelName } from '../util'
 import { Column } from 'mol-data/db'
 import { CustomPropertyDescriptor } from 'mol-model/structure';
-import { mmCIF_Database, mmCIF_Schema } from 'mol-io/reader/cif/schema/mmcif';
+import { mmCIF_Database } from 'mol-io/reader/cif/schema/mmcif';
 import { SortedArray } from 'mol-data/int';
 import { CifWriter } from 'mol-io/writer/cif'
 import { ElementIndex, ResidueIndex } from 'mol-model/structure/model/indexing';
