@@ -1,7 +1,8 @@
 /**
- * Copyright (c) 2017 Mol* contributors, licensed under MIT, See LICENSE file for more info.
+ * Copyright (c) 2017-2019 Mol* contributors, licensed under MIT, See LICENSE file for more info.
  *
  * @author David Sehnal <david.sehnal@gmail.com>
+ * @author Alexander Rose <alexander.rose@weirdbyte.de>
  */
 
 import { LinkType } from '../../../model/types'
@@ -11,6 +12,7 @@ import { IntAdjacencyGraph } from 'mol-math/graph';
 import { LinkComputationParameters, getElementIdx, MetalsSet, getElementThreshold, isHydrogen, getElementPairThreshold } from './common';
 import { SortedArray } from 'mol-data/int';
 import { StructConn, ComponentBond } from 'mol-model-formats/structure/mmcif/bonds';
+import { getIntraBondOrderFromTable } from 'mol-model/structure/model/properties/atomic/bonds';
 
 function getGraph(atomA: number[], atomB: number[], _order: number[], _flags: number[], atomCount: number): IntraUnitLinks {
     const builder = new IntAdjacencyGraph.EdgeBuilder(atomCount, atomA, atomB);
@@ -49,20 +51,20 @@ function _computeBonds(unit: Unit.Atomic, params: LinkComputationParameters): In
     for (let _aI = 0; _aI < atomCount; _aI++) {
         const aI =  atoms[_aI];
         const raI = residueIndex[aI];
+        const compId = label_comp_id.value(raI);
 
         if (!params.forceCompute && raI !== lastResidue) {
-            const resn = label_comp_id.value(raI)!;
-            if (!!component && component.entries.has(resn)) {
-                componentMap = component.entries.get(resn)!.map;
+            if (!!component && component.entries.has(compId)) {
+                componentMap = component.entries.get(compId)!.map;
             } else {
                 componentMap = void 0;
             }
         }
         lastResidue = raI;
 
-        const componentPairs = componentMap ? componentMap.get(label_atom_id.value(aI)) : void 0;
-
-        const aeI = getElementIdx(type_symbol.value(aI)!);
+        const aeI = getElementIdx(type_symbol.value(aI));
+        const atomIdA = label_atom_id.value(aI)
+        const componentPairs = componentMap ? componentMap.get(atomIdA) : void 0;
 
         const { indices, count, squaredDistances } = query3d.find(x[aI], y[aI], z[aI], MAX_RADIUS);
         const isHa = isHydrogen(aeI);
@@ -141,11 +143,11 @@ function _computeBonds(unit: Unit.Atomic, params: LinkComputationParameters): In
             }
 
             if (isHa || isHb) {
-                if (dist < params.maxHbondLength) {
+                if (dist < params.maxCovalentBondWithHydrogenLength) {
                     atomA[atomA.length] = _aI;
                     atomB[atomB.length] = _bI;
-                    order[order.length] = 1;
-                    flags[flags.length] = LinkType.Flag.Covalent | LinkType.Flag.Computed; // TODO: check if correct
+                    order[order.length] = 1; // covalent bonds involving hydrogen are always of order 1
+                    flags[flags.length] = LinkType.Flag.Covalent | LinkType.Flag.Computed;
                 }
                 continue;
             }
@@ -158,7 +160,7 @@ function _computeBonds(unit: Unit.Atomic, params: LinkComputationParameters): In
             if (dist <= pairingThreshold) {
                 atomA[atomA.length] = _aI;
                 atomB[atomB.length] = _bI;
-                order[order.length] = 1;
+                order[order.length] = getIntraBondOrderFromTable(compId, atomIdA, label_atom_id.value(bI));
                 flags[flags.length] = (isMetal ? LinkType.Flag.MetallicCoordination : LinkType.Flag.Covalent) | LinkType.Flag.Computed;
             }
         }
@@ -169,7 +171,7 @@ function _computeBonds(unit: Unit.Atomic, params: LinkComputationParameters): In
 
 function computeIntraUnitBonds(unit: Unit.Atomic, params?: Partial<LinkComputationParameters>) {
     return _computeBonds(unit, {
-        maxHbondLength: (params && params.maxHbondLength) || 1.15,
+        maxCovalentBondWithHydrogenLength: (params && params.maxCovalentBondWithHydrogenLength) || 1.15,
         forceCompute: !!(params && params.forceCompute),
     });
 }

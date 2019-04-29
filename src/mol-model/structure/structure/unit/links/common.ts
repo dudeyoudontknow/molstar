@@ -7,7 +7,7 @@
 import { ElementSymbol } from '../../../model/types';
 
 export interface LinkComputationParameters {
-    maxHbondLength: number,
+    maxCovalentBondWithHydrogenLength: number,
     forceCompute: boolean
 }
 

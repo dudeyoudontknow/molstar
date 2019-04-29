@@ -15,6 +15,7 @@ import { mmCIF_Database } from 'mol-io/reader/cif/schema/mmcif';
 import { SortedArray } from 'mol-data/int';
 import { CifWriter } from 'mol-io/writer/cif'
 import { ElementIndex, ResidueIndex } from 'mol-model/structure/model/indexing';
+import { getInterBondOrderFromTable } from 'mol-model/structure/model/properties/atomic/bonds';
 
 export interface StructConn {
     getResidueEntries(residueAIndex: ResidueIndex, residueBIndex: ResidueIndex): ReadonlyArray<StructConn.Entry>,
@@ -221,6 +222,13 @@ export namespace StructConn {
                 case 'doub': order = 2; break;
                 case 'trip': order = 3; break;
                 case 'quad': order = 4; break;
+                default:
+                    order = getInterBondOrderFromTable(
+                        struct_conn.ptnr1_label_comp_id.value(i),
+                        struct_conn.ptnr1_label_atom_id.value(i),
+                        struct_conn.ptnr2_label_comp_id.value(i),
+                        struct_conn.ptnr2_label_atom_id.value(i)
+                    )
             }
 
             switch (type) {

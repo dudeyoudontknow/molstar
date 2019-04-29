@@ -1,7 +1,8 @@
 /**
- * Copyright (c) 2017 Mol* contributors, licensed under MIT, See LICENSE file for more info.
+ * Copyright (c) 2017-2019 Mol* contributors, licensed under MIT, See LICENSE file for more info.
  *
  * @author David Sehnal <david.sehnal@gmail.com>
+ * @author Alexander Rose <alexander.rose@weirdbyte.de>
  */
 
 import { LinkType } from '../../../model/types';
@@ -14,6 +15,7 @@ import { SortedArray } from 'mol-data/int';
 import { Vec3, Mat4 } from 'mol-math/linear-algebra';
 import StructureElement from '../../element';
 import { StructConn } from 'mol-model-formats/structure/mmcif/bonds';
+import { getInterBondOrderFromTable } from 'mol-model/structure/model/properties/atomic/bonds';
 
 const MAX_RADIUS = 4;
 
@@ -42,13 +44,15 @@ function findPairLinks(unitA: Unit.Atomic, unitB: Unit.Atomic, params: LinkCompu
     const state: PairState = { mapAB: new Map(), mapBA: new Map(), bondedA: UniqueArray.create(), bondedB: UniqueArray.create() };
     let bondCount = 0;
 
-    const { elements: atomsA } = unitA;
+    const { elements: atomsA, residueIndex: residueIndexA } = unitA;
     const { x: xA, y: yA, z: zA } = unitA.model.atomicConformation;
-    const { elements: atomsB } = unitB;
+    const { elements: atomsB, residueIndex: residueIndexB } = unitB;
     const atomCount = unitA.elements.length;
 
-    const { type_symbol: type_symbolA, label_alt_id: label_alt_idA } = unitA.model.atomicHierarchy.atoms;
-    const { type_symbol: type_symbolB, label_alt_id: label_alt_idB } = unitB.model.atomicHierarchy.atoms;
+    const { type_symbol: type_symbolA, label_alt_id: label_alt_idA, label_atom_id: label_atom_idA } = unitA.model.atomicHierarchy.atoms;
+    const { type_symbol: type_symbolB, label_alt_id: label_alt_idB, label_atom_id: label_atom_idB } = unitB.model.atomicHierarchy.atoms;
+    const { label_comp_id: label_comp_idA } = unitA.model.atomicHierarchy.residues;
+    const { label_comp_id: label_comp_idB } = unitB.model.atomicHierarchy.residues;
     const { lookup3d } = unitB;
     const structConn = unitA.model === unitB.model && unitA.model.sourceData.kind === 'mmCIF' ? StructConn.get(unitA.model) : void 0;
 
@@ -89,6 +93,8 @@ function findPairLinks(unitA: Unit.Atomic, unitB: Unit.Atomic, params: LinkCompu
         const thresholdA = getElementThreshold(aeI);
         const altA = label_alt_idA.value(aI);
         const metalA = MetalsSet.has(aeI);
+        const atomIdA = label_atom_idA.value(aI);
+        const compIdA = label_comp_idA.value(residueIndexA[aI]);
 
         for (let ni = 0; ni < count; ni++) {
             const _bI = indices[ni];
@@ -125,8 +131,13 @@ function findPairLinks(unitA: Unit.Atomic, unitB: Unit.Atomic, params: LinkCompu
             }
 
             if (isHa || isHb) {
-                if (dist < params.maxHbondLength) {
-                    addLink(_aI, _bI, 1, LinkType.Flag.Covalent | LinkType.Flag.Computed, state); // TODO: check if correct
+                if (dist < params.maxCovalentBondWithHydrogenLength) {
+                    addLink(
+                        _aI, _bI,
+                        1, // covalent bonds involving a hydrogen are always of order 1
+                        LinkType.Flag.Covalent | LinkType.Flag.Computed,
+                        state
+                    );
                     bondCount++;
                 }
                 continue;
@@ -138,7 +149,14 @@ function findPairLinks(unitA: Unit.Atomic, unitB: Unit.Atomic, params: LinkCompu
                 : beI < 0 ? thresholdA : Math.max(thresholdA, getElementThreshold(beI));
 
             if (dist <= pairingThreshold) {
-                addLink(_aI, _bI, 1, (isMetal ? LinkType.Flag.MetallicCoordination : LinkType.Flag.Covalent) | LinkType.Flag.Computed, state);
+                const atomIdB = label_atom_idB.value(bI);
+                const compIdB = label_comp_idB.value(residueIndexB[bI]);
+                addLink(
+                    _aI, _bI,
+                    getInterBondOrderFromTable(compIdA, compIdB, atomIdA, atomIdB),
+                    (isMetal ? LinkType.Flag.MetallicCoordination : LinkType.Flag.Covalent) | LinkType.Flag.Computed,
+                    state
+                );
                 bondCount++;
             }
         }
@@ -179,7 +197,7 @@ function findLinks(structure: Structure, params: LinkComputationParameters) {
 
 function computeInterUnitBonds(structure: Structure, params?: Partial<LinkComputationParameters>): InterUnitBonds {
     return findLinks(structure, {
-        maxHbondLength: (params && params.maxHbondLength) || 1.15,
+        maxCovalentBondWithHydrogenLength: (params && params.maxCovalentBondWithHydrogenLength) || 1.15,
         forceCompute: !!(params && params.forceCompute),
     });
 }
