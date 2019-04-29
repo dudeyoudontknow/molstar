@@ -211,7 +211,7 @@ export namespace StructConn {
             const partners = _ps(i);
             if (partners.length < 2) continue;
 
-            const type = conn_type_id.value(i) as typeof mmCIF_Schema.struct_conn_type.id.T; // TODO workaround for dictionary inconsistency
+            const type = conn_type_id.value(i)
             const orderType = (pdbx_value_order.value(i) || '').toLowerCase();
             let flags = LinkType.Flag.None;
             let order = 1;
@@ -225,19 +225,13 @@ export namespace StructConn {
 
             switch (type) {
                 case 'covale':
-                case 'covale_base':
-                case 'covale_phosphate':
-                case 'covale_sugar':
-                case 'modres':
                     flags = LinkType.Flag.Covalent;
                     break;
                 case 'disulf': flags = LinkType.Flag.Covalent | LinkType.Flag.Sulfide; break;
                 case 'hydrog':
-                case 'mismat':
                     flags = LinkType.Flag.Hydrogen;
                     break;
                 case 'metalc': flags = LinkType.Flag.MetallicCoordination; break;
-                case 'saltbr': flags = LinkType.Flag.Ionic; break;
             }
 
             entries.push({ rowIndex: i, flags, order, distance: pdbx_dist_value.value(i), partners });
