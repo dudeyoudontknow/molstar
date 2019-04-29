@@ -29,18 +29,12 @@ export const enum AtomGeometry {
 
 export function assignGeometry (totalCoordination: number): AtomGeometry {
     switch (totalCoordination) {
-        case 0:
-        return AtomGeometry.Spherical
-        case 1:
-        return AtomGeometry.Terminal
-        case 2:
-        return AtomGeometry.Linear
-        case 3:
-        return AtomGeometry.Trigonal
-        case 4:
-        return AtomGeometry.Tetrahedral
-        default:
-        return AtomGeometry.Unknown
+        case 0: return AtomGeometry.Spherical
+        case 1: return AtomGeometry.Terminal
+        case 2: return AtomGeometry.Linear
+        case 3: return AtomGeometry.Trigonal
+        case 4: return AtomGeometry.Tetrahedral
+        default: return AtomGeometry.Unknown
     }
 }
 

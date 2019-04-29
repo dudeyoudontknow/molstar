@@ -44,8 +44,8 @@ async function downloadCif(url: string, isBinary: boolean) {
 }
 
 async function downloadFromPdb(pdb: string) {
-    // const parsed = await downloadCif(`https://files.rcsb.org/download/${pdb}.cif`, false);
-    const parsed = await downloadCif(`https://webchem.ncbr.muni.cz/ModelServer/static/bcif/${pdb}`, true);
+    const parsed = await downloadCif(`https://files.rcsb.org/download/${pdb}.cif`, false);
+    // const parsed = await downloadCif(`https://webchem.ncbr.muni.cz/ModelServer/static/bcif/${pdb}`, true);
     return parsed.blocks[0];
 }
 
@@ -78,11 +78,11 @@ function getGaussianSurfaceRepr() {
 }
 
 async function init() {
-    const cif = await downloadFromPdb('1crn')
+    const cif = await downloadFromPdb('1blu')
     const models = await getModels(cif)
     const structure = await getStructure(models[0])
     console.time('computeDSSP')
-    // await ComputedSecondaryStructure.attachFromCifOrCompute(structure)
+    await ComputedSecondaryStructure.attachFromCifOrCompute(structure)
     console.timeEnd('computeDSSP');
 
     console.time('computeValenceModel')

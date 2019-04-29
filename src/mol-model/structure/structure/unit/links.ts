@@ -135,6 +135,8 @@ namespace Link {
 
             this.intraBondEnd = unit.links.offset[index + 1]
             this.intraBondIndex = unit.links.offset[index]
+
+            this.hasNext = this.interBondIndex < this.interBondCount || this.intraBondIndex < this.intraBondEnd
         }
 
         private advance() {

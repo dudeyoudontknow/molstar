@@ -43,15 +43,13 @@ function isConjugated (structure: Structure, unit: Unit.Atomic, index: Structure
         const bA = tmpConjLinkItA.move()
         if (bA.order > 1) return true
         if (hetero) {
+            const elementB = typeSymbol(bA.otherUnit, bA.otherIndex)
             tmpConjLinkItB.setElement(structure, bA.otherUnit, bA.otherIndex)
-            while (tmpConjLinkItA.hasNext) {
+            while (tmpConjLinkItB.hasNext) {
                 const bB = tmpConjLinkItB.move()
                 if (bB.order > 1) {
-                    const elementB = typeSymbol(bA.otherUnit, bA.otherIndex)
-                    if (
-                        (elementB === Elements.P || elementB === Elements.S) &&
-                        typeSymbol(bB.otherUnit, bB.otherIndex) === Elements.O
-                    ) {
+                    if ((elementB === Elements.P || elementB === Elements.S) &&
+                            typeSymbol(bB.otherUnit, bB.otherIndex) === Elements.O) {
                         continue
                     }
                     return true
@@ -304,8 +302,8 @@ export interface ValenceModel {
 }
 
 export const ValenceModelParams = {
-    assignCharge: PD.Select('always', [['always', 'always'], ['auto', 'auto'], ['never', 'never']]),
-    assignH: PD.Select('always', [['always', 'always'], ['auto', 'auto'], ['never', 'never']]),
+    assignCharge: PD.Select('auto', [['always', 'always'], ['auto', 'auto'], ['never', 'never']]),
+    assignH: PD.Select('auto', [['always', 'always'], ['auto', 'auto'], ['never', 'never']]),
 }
 export type ValenceModelParams = typeof ValenceModelParams
 export type ValenceModelProps = PD.Values<ValenceModelParams>
