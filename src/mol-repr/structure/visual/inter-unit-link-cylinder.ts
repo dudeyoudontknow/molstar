@@ -4,7 +4,7 @@
  * @author Alexander Rose <alexander.rose@weirdbyte.de>
  */
 
-import { Link, Structure, StructureElement } from 'mol-model/structure';
+import { Link, Structure, StructureElement, Unit } from 'mol-model/structure';
 import { ComplexVisual } from '../representation';
 import { VisualUpdateState } from '../../util';
 import { createLinkCylinderMesh, LinkIterator, LinkCylinderParams } from './util/link';
@@ -19,6 +19,17 @@ import { PickingId } from 'mol-geo/geometry/picking';
 import { VisualContext } from 'mol-repr/visual';
 import { Theme } from 'mol-theme/theme';
 
+const tmpRefPosLinkIt = new Link.ElementLinkIterator()
+function setRefPosition(pos: Vec3, structure: Structure, unit: Unit.Atomic, index: StructureElement.UnitIndex) {
+    tmpRefPosLinkIt.setElement(structure, unit, index)
+    while (tmpRefPosLinkIt.hasNext) {
+        const bA = tmpRefPosLinkIt.move()
+        bA.otherUnit.conformation.position(bA.otherUnit.elements[bA.otherIndex], pos)
+        return pos
+    }
+    return null
+}
+
 function createInterUnitLinkCylinderMesh(ctx: VisualContext, structure: Structure, theme: Theme, props: PD.Values<InterUnitLinkParams>, mesh?: Mesh) {
     const links = structure.interUnitLinks
     const { bondCount, bonds } = links
@@ -27,10 +38,25 @@ function createInterUnitLinkCylinderMesh(ctx: VisualContext, structure: Structur
     if (!bondCount) return Mesh.createEmpty(mesh)
 
     const location = StructureElement.create()
+    const vRef = Vec3.zero()
 
     const builderProps = {
         linkCount: bondCount,
-        referencePosition: (edgeIndex: number) => null, // TODO
+        referencePosition: (edgeIndex: number) => {
+            const b = bonds[edgeIndex]
+            let unitA: Unit, unitB: Unit
+            let indexA: StructureElement.UnitIndex, indexB: StructureElement.UnitIndex
+            if (b.unitA.id < b.unitB.id) {
+                unitA = b.unitA, unitB = b.unitB
+                indexA = b.indexA, indexB = b.indexB
+            } else if (b.unitA.id > b.unitB.id) {
+                unitA = b.unitB, unitB = b.unitA
+                indexA = b.indexB, indexB = b.indexA
+            } else {
+                throw new Error('same units in createInterUnitLinkCylinderMesh')
+            }
+            return setRefPosition(vRef, structure, unitA, indexA) || setRefPosition(vRef, structure, unitB, indexB)
+        },
         position: (posA: Vec3, posB: Vec3, edgeIndex: number) => {
             const b = bonds[edgeIndex]
             const uA = b.unitA, uB = b.unitB
