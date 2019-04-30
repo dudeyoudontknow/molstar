@@ -133,12 +133,24 @@ function eachLink(loci: Loci, structure: Structure, apply: (interval: Interval) 
         }
     } else if (StructureElement.isLoci(loci)) {
         if (!Structure.areEquivalent(loci.structure, structure)) return false
-        // TODO mark link only when both of the link elements are in a StructureElement.Loci
+        if (loci.elements.length === 1) return false // only a single unit
+
+        const map = new Map<number, OrderedSet<StructureElement.UnitIndex>>()
+        for (const e of loci.elements) map.set(e.unit.id, e.indices)
+
         for (const e of loci.elements) {
-            OrderedSet.forEach(e.indices, v => {
-                const indices = structure.interUnitLinks.getBondIndices(v, e.unit)
-                for (let i = 0, il = indices.length; i < il; ++i) {
-                    if (apply(Interval.ofSingleton(indices[i]))) changed = true
+            structure.interUnitLinks.getLinkedUnits(e.unit).forEach(b => {
+                const otherLociIndices = map.get(b.unitB.id)
+                if (otherLociIndices) {
+                    OrderedSet.forEach(e.indices, v => {
+                        if (!b.linkedElementIndices.includes(v)) return
+                        b.getBonds(v).forEach(bi => {
+                            if (OrderedSet.has(otherLociIndices, bi.indexB)) {
+                                const idx = structure.interUnitLinks.getBondIndex(v, e.unit, bi.indexB, b.unitB)
+                                if (apply(Interval.ofSingleton(idx))) changed = true
+                            }
+                        })
+                    })
                 }
             })
         }
