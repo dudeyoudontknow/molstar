@@ -143,12 +143,21 @@ namespace StructureElement {
             const elements: Loci['elements'][0][] = [];
             for (const e of ys.elements) {
                 if (map.has(e.unit.id)) {
-                    elements[elements.length] = { unit: e.unit, indices: OrderedSet.union(map.get(e.unit.id)!, e.indices) };
+                    elements[elements.length] = {
+                        unit: e.unit,
+                        indices: OrderedSet.union(map.get(e.unit.id)!, e.indices)
+                    };
+                    map.delete(e.unit.id)
                 } else {
                     elements[elements.length] = e;
                 }
             }
-
+            map.forEach((indices, unitId) => {
+                elements[elements.length] = {
+                    unit: xs.structure.unitMap.get(unitId)!,
+                    indices
+                };
+            })
             return Loci(xs.structure, elements);
         }
 
