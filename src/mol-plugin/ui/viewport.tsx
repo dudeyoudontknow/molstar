@@ -13,6 +13,7 @@ import { ParameterControls } from './controls/parameters';
 import { Canvas3DParams } from 'mol-canvas3d/canvas3d';
 import { PluginLayoutStateParams } from 'mol-plugin/layout';
 import { ControlGroup, IconButton } from './controls/common';
+import { resizeCanvas } from 'mol-canvas3d/util';
 
 interface ViewportState {
     noWebGl: boolean
@@ -68,7 +69,7 @@ export class ViewportControls extends PluginUIComponent<{}, { isSettingsExpanded
                 {this.icon('reset-scene', this.resetCamera, 'Reset Camera')}<br/>
                 {this.icon('tools', this.toggleControls, 'Toggle Controls', this.plugin.layout.state.showControls)}<br/>
                 {this.icon('expand-layout', this.toggleExpanded, 'Toggle Expanded', this.plugin.layout.state.isExpanded)}<br />
-                {this.icon('settings', this.toggleSettingsExpanded, 'Settings', this.state.isSettingsExpanded)}
+                {this.icon('settings', this.toggleSettingsExpanded, 'Settings', this.state.isSettingsExpanded)}<br/>
             </div>
             {this.state.isSettingsExpanded && <div className='msp-viewport-controls-scene-options'>
                 <ControlGroup header='Layout' initialExpanded={true}>
@@ -91,7 +92,12 @@ export class Viewport extends PluginUIComponent<{ }, ViewportState> {
     };
 
     private handleResize = () => {
-        this.plugin.canvas3d.handleResize();
+        const container = this.container.current;
+        const canvas = this.canvas.current;
+        if (container && canvas) {
+            resizeCanvas(canvas, container);
+            this.plugin.canvas3d.handleResize();
+        }
     }
 
     componentDidMount() {

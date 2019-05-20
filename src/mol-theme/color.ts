@@ -1,5 +1,5 @@
 /**
- * Copyright (c) 2018 mol* contributors, licensed under MIT, See LICENSE file for more info.
+ * Copyright (c) 2018-2019 mol* contributors, licensed under MIT, See LICENSE file for more info.
  *
  * @author Alexander Rose <alexander.rose@weirdbyte.de>
  */
@@ -27,6 +27,9 @@ import { UnitIndexColorThemeProvider } from './color/unit-index';
 import { ScaleLegend } from 'mol-util/color/scale';
 import { TableLegend } from 'mol-util/color/tables';
 import { UncertaintyColorThemeProvider } from './color/uncertainty';
+import { EntitySourceColorThemeProvider } from './color/entity-source';
+import { IllustrativeColorThemeProvider } from './color/illustrative';
+import { HydrophobicityColorThemeProvider } from './color/hydrophobicity';
 
 export type LocationColor = (location: Location, isSecondary: boolean) => Color
 
@@ -73,6 +76,9 @@ export const BuiltInColorThemes = {
     'cross-link': CrossLinkColorThemeProvider,
     'element-index': ElementIndexColorThemeProvider,
     'element-symbol': ElementSymbolColorThemeProvider,
+    'entity-source': EntitySourceColorThemeProvider,
+    'hydrophobicity': HydrophobicityColorThemeProvider,
+    'illustrative': IllustrativeColorThemeProvider,
     'molecule-type': MoleculeTypeColorThemeProvider,
     'polymer-id': PolymerIdColorThemeProvider,
     'polymer-index': PolymerIndexColorThemeProvider,

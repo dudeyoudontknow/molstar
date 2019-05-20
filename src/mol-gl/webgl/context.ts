@@ -6,10 +6,13 @@
 
 import { createProgramCache, ProgramCache } from './program'
 import { createShaderCache, ShaderCache } from './shader'
-import { GLRenderingContext, COMPAT_instanced_arrays, COMPAT_standard_derivatives, COMPAT_vertex_array_object, getInstancedArrays, getStandardDerivatives, getVertexArrayObject, isWebGL2, COMPAT_element_index_uint, getElementIndexUint, COMPAT_texture_float, getTextureFloat, COMPAT_texture_float_linear, getTextureFloatLinear, COMPAT_blend_minmax, getBlendMinMax, getFragDepth, COMPAT_frag_depth, COMPAT_color_buffer_float, getColorBufferFloat, COMPAT_draw_buffers, getDrawBuffers, getShaderTextureLod, COMPAT_shader_texture_lod, getDepthTexture, COMPAT_depth_texture } from './compat';
+import { GLRenderingContext, isWebGL2 } from './compat';
 import { createFramebufferCache, FramebufferCache, checkFramebufferStatus } from './framebuffer';
 import { Scheduler } from 'mol-task';
 import { isDebugMode } from 'mol-util/debug';
+import { createExtensions, WebGLExtensions } from './extensions';
+import { WebGLState, createState } from './state';
+import { PixelData } from 'mol-util/image';
 
 export function getGLContext(canvas: HTMLCanvasElement, contextAttributes?: WebGLContextAttributes): GLRenderingContext | null {
     function getContext(contextId: 'webgl' | 'experimental-webgl' | 'webgl2') {
@@ -132,106 +135,17 @@ function readPixels(gl: GLRenderingContext, x: number, y: number, width: number,
     if (isDebugMode) checkError(gl)
 }
 
-export function createImageData(buffer: ArrayLike<number>, width: number, height: number) {
-    const w = width * 4
-    const h = height
-    const data = new Uint8ClampedArray(width * height * 4)
-    for (let i = 0, maxI = h / 2; i < maxI; ++i) {
-        for (let j = 0, maxJ = w; j < maxJ; ++j) {
-            const index1 = i * w + j;
-            const index2 = (h-i-1) * w + j;
-            data[index1] = buffer[index2];
-            data[index2] = buffer[index1];
-        }
-    }
-    return new ImageData(data, width, height);
+function getDrawingBufferPixelData(gl: GLRenderingContext) {
+    const w = gl.drawingBufferWidth
+    const h = gl.drawingBufferHeight
+    const buffer = new Uint8Array(w * h * 4)
+    unbindFramebuffer(gl)
+    gl.viewport(0, 0, w, h)
+    readPixels(gl, 0, 0, w, h, buffer)
+    return PixelData.flipY(PixelData.create(buffer, w, h))
 }
 
 //
-
-export type WebGLExtensions = {
-    instancedArrays: COMPAT_instanced_arrays
-    standardDerivatives: COMPAT_standard_derivatives
-    blendMinMax: COMPAT_blend_minmax
-    textureFloat: COMPAT_texture_float
-    textureFloatLinear: COMPAT_texture_float_linear
-    elementIndexUint: COMPAT_element_index_uint
-    depthTexture: COMPAT_depth_texture
-
-    vertexArrayObject: COMPAT_vertex_array_object | null
-    fragDepth: COMPAT_frag_depth | null
-    colorBufferFloat: COMPAT_color_buffer_float | null
-    drawBuffers: COMPAT_draw_buffers | null
-    shaderTextureLod: COMPAT_shader_texture_lod | null
-}
-
-function createExtensions(gl: GLRenderingContext): WebGLExtensions {
-    const instancedArrays = getInstancedArrays(gl)
-    if (instancedArrays === null) {
-        throw new Error('Could not find support for "instanced_arrays"')
-    }
-    const standardDerivatives = getStandardDerivatives(gl)
-    if (standardDerivatives === null) {
-        throw new Error('Could not find support for "standard_derivatives"')
-    }
-    const blendMinMax = getBlendMinMax(gl)
-    if (blendMinMax === null) {
-        throw new Error('Could not find support for "blend_minmax"')
-    }
-    const textureFloat = getTextureFloat(gl)
-    if (textureFloat === null) {
-        throw new Error('Could not find support for "texture_float"')
-    }
-    const textureFloatLinear = getTextureFloatLinear(gl)
-    if (textureFloatLinear === null) {
-        throw new Error('Could not find support for "texture_float_linear"')
-    }
-    const elementIndexUint = getElementIndexUint(gl)
-    if (elementIndexUint === null) {
-        throw new Error('Could not find support for "element_index_uint"')
-    }
-    const depthTexture = getDepthTexture(gl)
-    if (depthTexture === null) {
-        throw new Error('Could not find support for "depth_texture"')
-    }
-
-    const vertexArrayObject = getVertexArrayObject(gl)
-    if (vertexArrayObject === null) {
-        console.log('Could not find support for "vertex_array_object"')
-    }
-    const fragDepth = getFragDepth(gl)
-    if (fragDepth === null) {
-        console.log('Could not find support for "frag_depth"')
-    }
-    const colorBufferFloat = getColorBufferFloat(gl)
-    if (colorBufferFloat === null) {
-        console.log('Could not find support for "color_buffer_float"')
-    }
-    const drawBuffers = getDrawBuffers(gl)
-    if (drawBuffers === null) {
-        console.log('Could not find support for "draw_buffers"')
-    }
-    const shaderTextureLod = getShaderTextureLod(gl)
-    if (shaderTextureLod === null) {
-        console.log('Could not find support for "shader_texture_lod"')
-    }
-    
-    return {
-        instancedArrays,
-        standardDerivatives,
-        blendMinMax,
-        textureFloat,
-        textureFloatLinear,
-        elementIndexUint,
-        depthTexture,
-
-        vertexArrayObject,
-        fragDepth,
-        colorBufferFloat,
-        drawBuffers,
-        shaderTextureLod,
-    }
-}
 
 export type WebGLStats = {
     bufferCount: number
@@ -259,132 +173,7 @@ function createStats(): WebGLStats {
     }
 }
 
-export type WebGLState = {
-    currentProgramId: number
-    currentMaterialId: number
-    currentRenderItemId: number
-
-    enable: (cap: number) => void
-    disable: (cap: number) => void
-
-    frontFace: (mode: number) => void
-    cullFace: (mode: number) => void
-    depthMask: (flag: boolean) => void
-    colorMask: (red: boolean, green: boolean, blue: boolean, alpha: boolean) => void
-    clearColor: (red: number, green: number, blue: number, alpha: number) => void
-
-    blendFunc: (src: number, dst: number) => void
-    blendFuncSeparate: (srcRGB: number, dstRGB: number, srcAlpha: number, dstAlpha: number) => void
-
-    blendEquation: (mode: number) => void
-    blendEquationSeparate: (modeRGB: number, modeAlpha: number) => void
-}
-
-function createState(gl: GLRenderingContext): WebGLState {
-    const enabledCapabilities: { [k: number]: boolean } = {}
-
-    let currentFrontFace = gl.getParameter(gl.FRONT_FACE)
-    let currentCullFace = gl.getParameter(gl.CULL_FACE_MODE)
-    let currentDepthMask = gl.getParameter(gl.DEPTH_WRITEMASK)
-    let currentColorMask = gl.getParameter(gl.COLOR_WRITEMASK)
-    let currentClearColor = gl.getParameter(gl.COLOR_CLEAR_VALUE)
-
-    let currentBlendSrcRGB = gl.getParameter(gl.BLEND_SRC_RGB)
-    let currentBlendDstRGB = gl.getParameter(gl.BLEND_DST_RGB)
-    let currentBlendSrcAlpha = gl.getParameter(gl.BLEND_SRC_ALPHA)
-    let currentBlendDstAlpha = gl.getParameter(gl.BLEND_DST_ALPHA)
-
-    let currentBlendEqRGB = gl.getParameter(gl.BLEND_EQUATION_RGB)
-    let currentBlendEqAlpha = gl.getParameter(gl.BLEND_EQUATION_ALPHA)
-
-    return {
-        currentProgramId: -1,
-        currentMaterialId: -1,
-        currentRenderItemId: -1,
-
-        enable: (cap: number) => {
-            if (enabledCapabilities[cap] !== true ) {
-                gl.enable(cap)
-                enabledCapabilities[cap] = true
-            }
-        },
-        disable: (cap: number) => {
-            if (enabledCapabilities[cap] !== false) {
-                gl.disable(cap)
-                enabledCapabilities[cap] = false
-            }
-        },
-
-        frontFace: (mode: number) => {
-            if (mode !== currentFrontFace) {
-                gl.frontFace(mode)
-                currentFrontFace = mode
-            }
-        },
-        cullFace: (mode: number) => {
-            if (mode !== currentCullFace) {
-                gl.cullFace(mode)
-                currentCullFace = mode
-            }
-        },
-        depthMask: (flag: boolean) => {
-            if (flag !== currentDepthMask) {
-                gl.depthMask(flag)
-                currentDepthMask = flag
-            }
-        },
-        colorMask: (red: boolean, green: boolean, blue: boolean, alpha: boolean) => {
-            if (red !== currentColorMask[0] || green !== currentColorMask[1] || blue !== currentColorMask[2] || alpha !== currentColorMask[3])
-            gl.colorMask(red, green, blue, alpha)
-            currentColorMask[0] = red
-            currentColorMask[1] = green
-            currentColorMask[2] = blue
-            currentColorMask[3] = alpha
-        },
-        clearColor: (red: number, green: number, blue: number, alpha: number) => {
-            if (red !== currentClearColor[0] || green !== currentClearColor[1] || blue !== currentClearColor[2] || alpha !== currentClearColor[3])
-            gl.clearColor(red, green, blue, alpha)
-            currentClearColor[0] = red
-            currentClearColor[1] = green
-            currentClearColor[2] = blue
-            currentClearColor[3] = alpha
-        },
-
-        blendFunc: (src: number, dst: number) => {
-            if (src !== currentBlendSrcRGB || dst !== currentBlendDstRGB || src !== currentBlendSrcAlpha || dst !== currentBlendDstAlpha) {
-                gl.blendFunc(src, dst)
-                currentBlendSrcRGB = src
-                currentBlendDstRGB = dst
-                currentBlendSrcAlpha = src
-                currentBlendDstAlpha = dst
-            }
-        },
-        blendFuncSeparate: (srcRGB: number, dstRGB: number, srcAlpha: number, dstAlpha: number) => {
-            if (srcRGB !== currentBlendSrcRGB || dstRGB !== currentBlendDstRGB || srcAlpha !== currentBlendSrcAlpha || dstAlpha !== currentBlendDstAlpha) {
-                gl.blendFuncSeparate(srcRGB, dstRGB, srcAlpha, dstAlpha)
-                currentBlendSrcRGB = srcRGB
-                currentBlendDstRGB = dstRGB
-                currentBlendSrcAlpha = srcAlpha
-                currentBlendDstAlpha = dstAlpha
-            }
-        },
-
-        blendEquation: (mode: number) => {
-            if (mode !== currentBlendEqRGB || mode !== currentBlendEqAlpha) {
-                gl.blendEquation(mode)
-                currentBlendEqRGB = mode
-                currentBlendEqAlpha = mode
-            }
-        },
-        blendEquationSeparate: (modeRGB: number, modeAlpha: number) => {
-            if (modeRGB !== currentBlendEqRGB || modeAlpha !== currentBlendEqAlpha) {
-                gl.blendEquationSeparate(modeRGB, modeAlpha)
-                currentBlendEqRGB = modeRGB
-                currentBlendEqAlpha = modeAlpha
-            }
-        }
-    }
-}
+//
 
 /** A WebGL context object, including the rendering context, resource caches and counts */
 export interface WebGLContext {
@@ -408,6 +197,7 @@ export interface WebGLContext {
     readPixelsAsync: (x: number, y: number, width: number, height: number, buffer: Uint8Array) => Promise<void>
     waitForGpuCommandsComplete: () => Promise<void>
     waitForGpuCommandsCompleteSync: () => void
+    getDrawingBufferPixelData: () => PixelData
     destroy: () => void
 }
 
@@ -493,6 +283,7 @@ export function createContext(gl: GLRenderingContext): WebGLContext {
         readPixelsAsync,
         waitForGpuCommandsComplete: () => waitForGpuCommandsComplete(gl),
         waitForGpuCommandsCompleteSync: () => waitForGpuCommandsCompleteSync(gl),
+        getDrawingBufferPixelData: () => getDrawingBufferPixelData(gl),
 
         destroy: () => {
             unbindResources(gl)

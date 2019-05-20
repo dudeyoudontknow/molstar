@@ -18,6 +18,8 @@ import { decodeFloatRGB } from 'mol-util/float-packing';
 import { ShaderCode } from 'mol-gl/shader-code';
 import { createComputeRenderItem } from 'mol-gl/webgl/render-item';
 import { ValueSpec, AttributeSpec, UniformSpec, TextureSpec, DefineSpec, Values } from 'mol-gl/renderable/schema';
+import gaussian_density_vert from 'mol-gl/shader/gaussian-density.vert'
+import gaussian_density_frag from 'mol-gl/shader/gaussian-density.frag'
 
 export const GaussianDensitySchema = {
     drawCount: ValueSpec('number'),
@@ -44,8 +46,7 @@ export const GaussianDensitySchema = {
 }
 
 export const GaussianDensityShaderCode = ShaderCode(
-    require('mol-gl/shader/gaussian-density.vert').default,
-    require('mol-gl/shader/gaussian-density.frag').default,
+    gaussian_density_vert, gaussian_density_frag,
     { standardDerivatives: false, fragDepth: false }
 )
 
@@ -306,6 +307,9 @@ function setupMinDistanceRendering(webgl: WebGLContext, renderable: ComputeRende
     state.colorMask(false, false, false, true)
     state.blendFunc(gl.ONE, gl.ONE)
     // the shader writes 1 - dist so we set blending to MAX
+    if (!webgl.extensions.blendMinMax) {
+        throw new Error('GPU gaussian surface calculation requires EXT_blend_minmax')
+    }
     state.blendEquation(webgl.extensions.blendMinMax.MAX)
 }
 

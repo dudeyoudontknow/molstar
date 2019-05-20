@@ -108,7 +108,7 @@ const TrajectoryFromPDB = PluginStateTransform.BuiltIn({
 })({
     apply({ a }) {
         return Task.create('Parse PDB', async ctx => {
-            const parsed = await parsePDB(a.data).runInContext(ctx);
+            const parsed = await parsePDB(a.data, a.label).runInContext(ctx);
             if (parsed.isError) throw new Error(parsed.message);
             const models = await trajectoryFromPDB(parsed.result).runInContext(ctx);
             const props = { label: models[0].label, description: `${models.length} model${models.length === 1 ? '' : 's'}` };
@@ -153,10 +153,9 @@ const ModelFromTrajectory = PluginStateTransform.BuiltIn({
     apply({ a, params }) {
         if (params.modelIndex < 0 || params.modelIndex >= a.data.length) throw new Error(`Invalid modelIndex ${params.modelIndex}`);
         const model = a.data[params.modelIndex];
-        const props = a.data.length === 1
-            ? { label: `${model.label}` }
-            : { label: `${model.label}:${model.modelNum}`, description: `Model ${params.modelIndex + 1} of ${a.data.length}` };
-        return new SO.Molecule.Model(model, props);
+        const label = a.data.length === 1 ? model.entry : `${model.entry}: ${model.modelNum}`
+        const description = a.data.length === 1 ? undefined : `Model ${params.modelIndex + 1} of ${a.data.length}`
+        return new SO.Molecule.Model(model, { label, description });
     }
 });
 
@@ -223,7 +222,7 @@ const StructureAssemblyFromModel = PluginStateTransform.BuiltIn({
             const base = Structure.ofModel(model);
             if (!asm) {
                 await ensureSecondaryStructure(base)
-                const label = { label: a.data.label, description: structureDesc(base) };
+                const label = { label: 'Deposited', description: structureDesc(base) };
                 return new SO.Molecule.Structure(base, label);
             }
 

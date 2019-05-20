@@ -8,7 +8,7 @@ import { Viewport } from 'mol-canvas3d/camera/util';
 import { Camera } from 'mol-canvas3d/camera';
 
 import Scene from './scene';
-import { WebGLContext, createImageData } from './webgl/context';
+import { WebGLContext } from './webgl/context';
 import { Mat4, Vec3, Vec4 } from 'mol-math/linear-algebra';
 import { Renderable } from './renderable';
 import { Color } from 'mol-util/color';
@@ -38,10 +38,9 @@ interface Renderer {
     readonly props: Readonly<RendererProps>
 
     clear: () => void
-    render: (scene: Scene, variant: GraphicsRenderVariant) => void
+    render: (scene: Scene, variant: GraphicsRenderVariant, clear: boolean) => void
     setProps: (props: Partial<RendererProps>) => void
     setViewport: (x: number, y: number, width: number, height: number) => void
-    getImageData: () => ImageData
     dispose: () => void
 }
 
@@ -85,6 +84,7 @@ namespace Renderer {
             uModelViewProjection: ValueCell.create(modelViewProjection),
             uInvModelViewProjection: ValueCell.create(invModelViewProjection),
 
+            uIsOrtho: ValueCell.create(camera.state.mode === 'orthographic' ? 1 : 0),
             uPixelRatio: ValueCell.create(ctx.pixelRatio),
             uViewportHeight: ValueCell.create(viewport.height),
             uViewport: ValueCell.create(Viewport.toVec4(Vec4(), viewport)),
@@ -97,6 +97,8 @@ namespace Renderer {
             uReflectivity: ValueCell.create(p.reflectivity),
 
             uCameraPosition: ValueCell.create(Vec3.clone(camera.state.position)),
+            uNear: ValueCell.create(camera.state.near),
+            uFar: ValueCell.create(camera.state.far),
             uFogNear: ValueCell.create(camera.state.fogNear),
             uFogFar: ValueCell.create(camera.state.fogFar),
             uFogColor: ValueCell.create(bgColor),
@@ -151,7 +153,7 @@ namespace Renderer {
             }
         }
 
-        const render = (scene: Scene, variant: GraphicsRenderVariant) => {
+        const render = (scene: Scene, variant: GraphicsRenderVariant, clear: boolean) => {
             ValueCell.update(globalUniforms.uModel, scene.view)
             ValueCell.update(globalUniforms.uView, camera.view)
             ValueCell.update(globalUniforms.uInvView, Mat4.invert(invView, camera.view))
@@ -162,7 +164,11 @@ namespace Renderer {
             ValueCell.update(globalUniforms.uModelViewProjection, Mat4.mul(modelViewProjection, modelView, camera.projection))
             ValueCell.update(globalUniforms.uInvModelViewProjection, Mat4.invert(invModelViewProjection, modelViewProjection))
 
+            ValueCell.update(globalUniforms.uIsOrtho, camera.state.mode === 'orthographic' ? 1 : 0)
+
             ValueCell.update(globalUniforms.uCameraPosition, camera.state.position)
+            ValueCell.update(globalUniforms.uFar, camera.state.far)
+            ValueCell.update(globalUniforms.uNear, camera.state.near)
             ValueCell.update(globalUniforms.uFogFar, camera.state.fogFar)
             ValueCell.update(globalUniforms.uFogNear, camera.state.fogNear)
 
@@ -176,10 +182,17 @@ namespace Renderer {
             state.depthMask(true)
             state.colorMask(true, true, true, true)
             state.enable(gl.DEPTH_TEST)
-            state.clearColor(bgColor[0], bgColor[1], bgColor[2], 1.0)
-            gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
 
-            if (variant === 'draw') {
+            if (clear) {
+                if (variant === 'color') {
+                    state.clearColor(bgColor[0], bgColor[1], bgColor[2], 1.0)
+                } else {
+                    state.clearColor(1, 1, 1, 1)
+                }
+                gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
+            }
+
+            if (variant === 'color') {
                 for (let i = 0, il = renderables.length; i < il; ++i) {
                     const r = renderables[i]
                     if (r.state.opaque) renderObject(r, variant)
@@ -192,8 +205,7 @@ namespace Renderer {
                     state.depthMask(r.values.uAlpha.ref.value === 1.0)
                     if (!r.state.opaque) renderObject(r, variant)
                 }
-            } else {
-                // picking
+            } else { // picking & depth
                 for (let i = 0, il = renderables.length; i < il; ++i) {
                     renderObject(renderables[i], variant)
                 }
@@ -205,6 +217,7 @@ namespace Renderer {
         return {
             clear: () => {
                 state.depthMask(true)
+                state.colorMask(true, true, true, true)
                 state.clearColor(bgColor[0], bgColor[1], bgColor[2], 1.0)
                 gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT)
             },
@@ -249,15 +262,6 @@ namespace Renderer {
                     ValueCell.update(globalUniforms.uViewportHeight, height)
                     ValueCell.update(globalUniforms.uViewport, Vec4.set(globalUniforms.uViewport.ref.value, x, y, width, height))
                 }
-            },
-            getImageData: () => {
-                const { x, y, width, height } = viewport
-                const dw = width - x
-                const dh = height - y
-                const buffer = new Uint8Array(dw * dh * 4)
-                ctx.unbindFramebuffer()
-                ctx.readPixels(x, y, width, height, buffer)
-                return createImageData(buffer, dw, dh)
             },
 
             get props() {

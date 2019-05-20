@@ -6,18 +6,14 @@
 
 import { BehaviorSubject, Subscription } from 'rxjs';
 import { now } from 'mol-util/now';
-
-import { Vec3, Vec2 } from 'mol-math/linear-algebra'
+import { Vec3 } from 'mol-math/linear-algebra'
 import InputObserver, { ModifiersKeys, ButtonsType } from 'mol-util/input/input-observer'
 import Renderer, { RendererStats, RendererParams } from 'mol-gl/renderer'
 import { GraphicsRenderObject } from 'mol-gl/render-object'
-
 import { TrackballControls, TrackballControlsParams } from './controls/trackball'
 import { Viewport } from './camera/util'
-import { resizeCanvas } from './util';
-import { createContext, getGLContext, WebGLContext } from 'mol-gl/webgl/context';
+import { createContext, WebGLContext, getGLContext } from 'mol-gl/webgl/context';
 import { Representation } from 'mol-repr/representation';
-import { createRenderTarget } from 'mol-gl/webgl/render-target';
 import Scene from 'mol-gl/scene';
 import { GraphicsRenderVariant } from 'mol-gl/webgl/render-item';
 import { PickingId } from 'mol-geo/geometry/picking';
@@ -26,12 +22,15 @@ import { Loci, EmptyLoci, isEmptyLoci } from 'mol-model/loci';
 import { Camera } from './camera';
 import { ParamDefinition as PD } from 'mol-util/param-definition';
 import { BoundingSphereHelper, DebugHelperParams } from './helper/bounding-sphere-helper';
-import { decodeFloatRGB } from 'mol-util/float-packing';
 import { SetUtils } from 'mol-util/set';
 import { Canvas3dInteractionHelper } from './helper/interaction-events';
-import { createTexture } from 'mol-gl/webgl/texture';
-import { ValueCell } from 'mol-util';
-import { getPostprocessingRenderable, PostprocessingParams } from './helper/postprocessing';
+import { PostprocessingParams, PostprocessingPass } from './passes/postprocessing';
+import { MultiSampleParams, MultiSamplePass } from './passes/multi-sample';
+import { GLRenderingContext } from 'mol-gl/webgl/compat';
+import { PixelData } from 'mol-util/image';
+import { readTexture } from 'mol-gl/compute/util';
+import { DrawPass } from './passes/draw';
+import { PickPass } from './passes/pick';
 
 export const Canvas3DParams = {
     // TODO: FPS cap?
@@ -41,6 +40,7 @@ export const Canvas3DParams = {
     clip: PD.Interval([1, 100], { min: 1, max: 100, step: 1 }),
     fog: PD.Interval([50, 100], { min: 1, max: 100, step: 1 }),
 
+    multiSample: PD.Group(MultiSampleParams),
     postprocessing: PD.Group(PostprocessingParams),
     renderer: PD.Group(RendererParams),
     trackball: PD.Group(TrackballControlsParams),
@@ -61,7 +61,6 @@ interface Canvas3D {
     // draw: (force?: boolean) => void
     requestDraw: (force?: boolean) => void
     animate: () => void
-    pick: () => void
     identify: (x: number, y: number) => PickingId | undefined
     mark: (loci: Representation.Loci, action: MarkerAction) => void
     getLoci: (pickingId: PickingId) => Representation.Loci
@@ -73,7 +72,7 @@ interface Canvas3D {
     resetCamera: () => void
     readonly camera: Camera
     downloadScreenshot: () => void
-    getImageData: (variant: GraphicsRenderVariant) => ImageData
+    getPixelData: (variant: GraphicsRenderVariant) => PixelData
     setProps: (props: Partial<Canvas3DProps>) => void
 
     /** Returns a copy of the current Canvas3D instance props */
@@ -85,11 +84,25 @@ interface Canvas3D {
     dispose: () => void
 }
 
+const requestAnimationFrame = typeof window !== 'undefined' ? window.requestAnimationFrame : (f: (time: number) => void) => setImmediate(()=>f(Date.now()))
+
 namespace Canvas3D {
     export interface HighlightEvent { current: Representation.Loci, prev: Representation.Loci, modifiers?: ModifiersKeys }
     export interface ClickEvent { current: Representation.Loci, buttons: ButtonsType, modifiers: ModifiersKeys }
 
-    export function create(canvas: HTMLCanvasElement, container: Element, props: Partial<Canvas3DProps> = {}): Canvas3D {
+    export function fromCanvas(canvas: HTMLCanvasElement, props: Partial<Canvas3DProps> = {}) {
+        const gl = getGLContext(canvas, {
+            alpha: false,
+            antialias: true,
+            depth: true,
+            preserveDrawingBuffer: true
+        })
+        if (gl === null) throw new Error('Could not create a WebGL rendering context')
+        const input = InputObserver.fromElement(canvas)
+        return Canvas3D.create(gl, input, props)
+    }
+
+    export function create(gl: GLRenderingContext, input: InputObserver, props: Partial<Canvas3DProps> = {}): Canvas3D {
         const p = { ...PD.getDefaultValues(Canvas3DParams), ...props }
 
         const reprRenderObjects = new Map<Representation.Any, Set<GraphicsRenderObject>>()
@@ -98,7 +111,6 @@ namespace Canvas3D {
 
         const startTime = now()
         const didDraw = new BehaviorSubject<now.Timestamp>(0 as now.Timestamp)
-        const input = InputObserver.create(canvas)
 
         const camera = new Camera({
             near: 0.1,
@@ -107,41 +119,24 @@ namespace Canvas3D {
             mode: p.cameraMode
         })
 
-        const gl = getGLContext(canvas, {
-            alpha: false,
-            antialias: true,
-            depth: true,
-            preserveDrawingBuffer: true
-        })
-        if (gl === null) {
-            throw new Error('Could not create a WebGL rendering context')
-        }
         const webgl = createContext(gl)
+
+        let width = gl.drawingBufferWidth
+        let height = gl.drawingBufferHeight
 
         const scene = Scene.create(webgl)
         const controls = TrackballControls.create(input, camera, p.trackball)
         const renderer = Renderer.create(webgl, camera, p.renderer)
-
-        const drawTarget = createRenderTarget(webgl, canvas.width, canvas.height)
-        const depthTexture = createTexture(webgl, 'image-depth', 'depth', 'ushort', 'nearest')
-        depthTexture.define(canvas.width, canvas.height)
-        depthTexture.attachFramebuffer(drawTarget.framebuffer, 'depth')
-        const postprocessing = getPostprocessingRenderable(webgl, drawTarget.texture, depthTexture, p.postprocessing)
-
-        let pickScale = 0.25 / webgl.pixelRatio
-        let pickWidth = Math.round(canvas.width * pickScale)
-        let pickHeight = Math.round(canvas.height * pickScale)
-        const objectPickTarget = createRenderTarget(webgl, pickWidth, pickHeight)
-        const instancePickTarget = createRenderTarget(webgl, pickWidth, pickHeight)
-        const groupPickTarget = createRenderTarget(webgl, pickWidth, pickHeight)
-
-        let pickDirty = true
-        let isIdentifying = false
-        let isUpdating = false
-        let drawPending = false
-
         const debugHelper = new BoundingSphereHelper(webgl, scene, p.debug);
         const interactionHelper = new Canvas3dInteractionHelper(identify, getLoci, input);
+
+        const drawPass = new DrawPass(webgl, renderer, scene, debugHelper)
+        const pickPass = new PickPass(webgl, renderer, scene, 0.5)
+        const postprocessing = new PostprocessingPass(webgl, drawPass, p.postprocessing)
+        const multiSample = new MultiSamplePass(webgl, camera, drawPass, postprocessing, p.multiSample)
+
+        let isUpdating = false
+        let drawPending = false
 
         function getLoci(pickingId: PickingId) {
             let loci: Loci = EmptyLoci
@@ -167,9 +162,9 @@ namespace Canvas3D {
             }
             if (changed) {
                 scene.update(void 0, true)
-                const prevPickDirty = pickDirty
+                const prevPickDirty = pickPass.pickDirty
                 draw(true)
-                pickDirty = prevPickDirty // marking does not change picking buffers
+                pickPass.pickDirty = prevPickDirty // marking does not change picking buffers
             }
         }
 
@@ -189,9 +184,9 @@ namespace Canvas3D {
             let fogFar = cDist + (bRadius * fogFarFactor)
 
             if (camera.state.mode === 'perspective') {
-                near = Math.max(0.1, p.cameraClipDistance, near)
+                near = Math.max(1, p.cameraClipDistance, near)
                 far = Math.max(1, far)
-                fogNear = Math.max(0.1, fogNear)
+                fogNear = Math.max(1, fogNear)
                 fogFar = Math.max(1, fogFar)
             } else if (camera.state.mode === 'orthographic') {
                 if (p.cameraClipDistance > 0) {
@@ -206,46 +201,29 @@ namespace Canvas3D {
         }
 
         function render(variant: 'pick' | 'draw', force: boolean) {
-            if (isIdentifying || isUpdating) return false
+            if (isUpdating) return false
 
             let didRender = false
             controls.update(currentTime);
             // TODO: is this a good fix? Also, setClipping does not work if the user has manually set a clipping plane.
             if (!camera.transition.inTransition) setClipping();
             const cameraChanged = camera.updateMatrices();
-            const postprocessingEnabled = p.postprocessing.occlusionEnable || p.postprocessing.outlineEnable
+            multiSample.update(force || cameraChanged, currentTime)
 
-            if (force || cameraChanged) {
+            if (force || cameraChanged || multiSample.enabled) {
                 switch (variant) {
                     case 'pick':
-                        renderer.setViewport(0, 0, pickWidth, pickHeight);
-                        objectPickTarget.bind();
-                        renderer.render(scene, 'pickObject');
-                        instancePickTarget.bind();
-                        renderer.render(scene, 'pickInstance');
-                        groupPickTarget.bind();
-                        renderer.render(scene, 'pickGroup');
+                        pickPass.render()
                         break;
                     case 'draw':
-                        renderer.setViewport(0, 0, canvas.width, canvas.height);
-                        if (postprocessingEnabled) {
-                            drawTarget.bind()
+                        renderer.setViewport(0, 0, width, height);
+                        if (multiSample.enabled) {
+                            multiSample.render()
                         } else {
-                            webgl.unbindFramebuffer();
+                            drawPass.render(!postprocessing.enabled)
+                            if (postprocessing.enabled) postprocessing.render(true)
                         }
-                        renderer.render(scene, 'draw');
-                        if (debugHelper.isEnabled) {
-                            debugHelper.syncVisibility()
-                            renderer.render(debugHelper.scene, 'draw')
-                        }
-                        if (postprocessingEnabled) {
-                            webgl.unbindFramebuffer();
-                            webgl.state.disable(webgl.gl.SCISSOR_TEST)
-                            webgl.state.disable(webgl.gl.BLEND)
-                            webgl.state.disable(webgl.gl.DEPTH_TEST)
-                            postprocessing.render()
-                        }
-                        pickDirty = true
+                        pickPass.pickDirty = true
                         break;
                 }
                 didRender = true
@@ -276,48 +254,11 @@ namespace Canvas3D {
             camera.transition.tick(currentTime);
             draw(false);
             if (!camera.transition.inTransition) interactionHelper.tick(currentTime);
-            window.requestAnimationFrame(animate)
+            requestAnimationFrame(animate)
         }
 
-        function pick() {
-            if (pickDirty) {
-                render('pick', true)
-                pickDirty = false
-            }
-        }
-
-        const readBuffer = new Uint8Array(4)
         function identify(x: number, y: number): PickingId | undefined {
-            if (isIdentifying) return
-
-            pick() // must be called before setting `isIdentifying = true`
-            isIdentifying = true
-
-            x *= webgl.pixelRatio
-            y *= webgl.pixelRatio
-            y = canvas.height - y // flip y
-
-            const xp = Math.round(x * pickScale)
-            const yp = Math.round(y * pickScale)
-
-            objectPickTarget.bind()
-            webgl.readPixels(xp, yp, 1, 1, readBuffer)
-            const objectId = decodeFloatRGB(readBuffer[0], readBuffer[1], readBuffer[2])
-            if (objectId === -1) { isIdentifying = false; return; }
-
-            instancePickTarget.bind()
-            webgl.readPixels(xp, yp, 1, 1, readBuffer)
-            const instanceId = decodeFloatRGB(readBuffer[0], readBuffer[1], readBuffer[2])
-            if (instanceId === -1) { isIdentifying = false; return; }
-
-            groupPickTarget.bind()
-            webgl.readPixels(xp, yp, 1, 1, readBuffer)
-            const groupId = decodeFloatRGB(readBuffer[0], readBuffer[1], readBuffer[2])
-            if (groupId === -1) { isIdentifying = false; return; }
-
-            isIdentifying = false
-
-            return { objectId, instanceId, groupId }
+            return pickPass.identify(x, y)
         }
 
         function add(repr: Representation.Any) {
@@ -387,7 +328,6 @@ namespace Canvas3D {
             // draw,
             requestDraw,
             animate,
-            pick,
             identify,
             mark,
             getLoci,
@@ -401,12 +341,13 @@ namespace Canvas3D {
             downloadScreenshot: () => {
                 // TODO
             },
-            getImageData: (variant: GraphicsRenderVariant) => {
+            getPixelData: (variant: GraphicsRenderVariant) => {
                 switch (variant) {
-                    case 'draw': return renderer.getImageData()
-                    case 'pickObject': return objectPickTarget.getImageData()
-                    case 'pickInstance': return instancePickTarget.getImageData()
-                    case 'pickGroup': return groupPickTarget.getImageData()
+                    case 'color': return webgl.getDrawingBufferPixelData()
+                    case 'pickObject': return pickPass.objectPickTarget.getPixelData()
+                    case 'pickInstance': return pickPass.instancePickTarget.getPixelData()
+                    case 'pickGroup': return pickPass.groupPickTarget.getPixelData()
+                    case 'depth': return readTexture(webgl, drawPass.depthTexture) as PixelData
                 }
             },
             didDraw,
@@ -418,40 +359,8 @@ namespace Canvas3D {
                 if (props.clip !== undefined) p.clip = [props.clip[0], props.clip[1]]
                 if (props.fog !== undefined) p.fog = [props.fog[0], props.fog[1]]
 
-                if (props.postprocessing) {
-                    if (props.postprocessing.occlusionEnable !== undefined) {
-                        p.postprocessing.occlusionEnable = props.postprocessing.occlusionEnable
-                        ValueCell.update(postprocessing.values.dOcclusionEnable, props.postprocessing.occlusionEnable)
-                    }
-                    if (props.postprocessing.occlusionKernelSize !== undefined) {
-                        p.postprocessing.occlusionKernelSize = props.postprocessing.occlusionKernelSize
-                        ValueCell.update(postprocessing.values.dOcclusionKernelSize, props.postprocessing.occlusionKernelSize)
-                    }
-                    if (props.postprocessing.occlusionBias !== undefined) {
-                        p.postprocessing.occlusionBias = props.postprocessing.occlusionBias
-                        ValueCell.update(postprocessing.values.uOcclusionBias, props.postprocessing.occlusionBias)
-                    }
-                    if (props.postprocessing.occlusionRadius !== undefined) {
-                        p.postprocessing.occlusionRadius = props.postprocessing.occlusionRadius
-                        ValueCell.update(postprocessing.values.uOcclusionRadius, props.postprocessing.occlusionRadius)
-                    }
-
-                    if (props.postprocessing.outlineEnable !== undefined) {
-                        p.postprocessing.outlineEnable = props.postprocessing.outlineEnable
-                        ValueCell.update(postprocessing.values.dOutlineEnable, props.postprocessing.outlineEnable)
-                    }
-                    if (props.postprocessing.outlineScale !== undefined) {
-                        p.postprocessing.outlineScale = props.postprocessing.outlineScale
-                        ValueCell.update(postprocessing.values.uOutlineScale, props.postprocessing.outlineScale * webgl.pixelRatio)
-                    }
-                    if (props.postprocessing.outlineThreshold !== undefined) {
-                        p.postprocessing.outlineThreshold = props.postprocessing.outlineThreshold
-                        ValueCell.update(postprocessing.values.uOutlineThreshold, props.postprocessing.outlineThreshold)
-                    }
-
-                    postprocessing.update()
-                }
-
+                if (props.postprocessing) postprocessing.setProps(props.postprocessing)
+                if (props.multiSample) multiSample.setProps(props.multiSample)
                 if (props.renderer) renderer.setProps(props.renderer)
                 if (props.trackball) controls.setProps(props.trackball)
                 if (props.debug) debugHelper.setProps(props.debug)
@@ -465,7 +374,8 @@ namespace Canvas3D {
                     clip: p.clip,
                     fog: p.fog,
 
-                    postprocessing: { ...p.postprocessing },
+                    postprocessing: { ...postprocessing.props },
+                    multiSample: { ...multiSample.props },
                     renderer: { ...renderer.props },
                     trackball: { ...controls.props },
                     debug: { ...debugHelper.props }
@@ -492,21 +402,17 @@ namespace Canvas3D {
         }
 
         function handleResize() {
-            resizeCanvas(canvas, container)
-            renderer.setViewport(0, 0, canvas.width, canvas.height)
-            Viewport.set(camera.viewport, 0, 0, canvas.width, canvas.height)
-            Viewport.set(controls.viewport, 0, 0, canvas.width, canvas.height)
+            width = gl.drawingBufferWidth
+            height = gl.drawingBufferHeight
 
-            drawTarget.setSize(canvas.width, canvas.height)
-            depthTexture.define(canvas.width, canvas.height)
-            ValueCell.update(postprocessing.values.uTexSize, Vec2.set(postprocessing.values.uTexSize.ref.value, canvas.width, canvas.height))
+            renderer.setViewport(0, 0, width, height)
+            Viewport.set(camera.viewport, 0, 0, width, height)
+            Viewport.set(controls.viewport, 0, 0, width, height)
 
-            pickScale = 0.25 / webgl.pixelRatio
-            pickWidth = Math.round(canvas.width * pickScale)
-            pickHeight = Math.round(canvas.height * pickScale)
-            objectPickTarget.setSize(pickWidth, pickHeight)
-            instancePickTarget.setSize(pickWidth, pickHeight)
-            groupPickTarget.setSize(pickWidth, pickHeight)
+            drawPass.setSize(width, height)
+            pickPass.setSize(width, height)
+            postprocessing.setSize(width, height)
+            multiSample.setSize(width, height)
 
             requestDraw(true)
         }

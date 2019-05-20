@@ -778,52 +778,32 @@ namespace Mat4 {
     }
 
     /**
-     * Generates a frustum matrix with the given bounds
+     * Generates a perspective projection (frustum) matrix with the given bounds
      */
-    export function frustum(out: Mat4, left: number, right: number, bottom: number, top: number, near: number, far: number) {
-        const rl = 1 / (right - left);
-        const tb = 1 / (top - bottom);
-        const nf = 1 / (near - far);
-        out[0] = (near * 2) * rl;
-        out[1] = 0;
-        out[2] = 0;
-        out[3] = 0;
-        out[4] = 0;
-        out[5] = (near * 2) * tb;
-        out[6] = 0;
-        out[7] = 0;
-        out[8] = (right + left) * rl;
-        out[9] = (top + bottom) * tb;
-        out[10] = (far + near) * nf;
-        out[11] = -1;
-        out[12] = 0;
-        out[13] = 0;
-        out[14] = (far * near * 2) * nf;
-        out[15] = 0;
-        return out;
-    }
+    export function perspective(out: Mat4, left: number, right: number, top: number, bottom: number, near: number, far: number) {
+        const x = 2 * near / (right - left);
+        const y = 2 * near / (top - bottom);
 
-    /**
-     * Generates a perspective projection matrix with the given bounds
-     */
-    export function perspective(out: Mat4, fovy: number, aspect: number, near: number, far: number) {
-        const f = 1.0 / Math.tan(fovy / 2);
-        const nf = 1 / (near - far);
-        out[0] = f / aspect;
+        const a = (right + left) / (right - left);
+        const b = (top + bottom) / (top - bottom);
+        const c = -(far + near) / (far - near);
+        const d = -2 * far * near / (far - near);
+
+        out[0] = x;
         out[1] = 0;
         out[2] = 0;
         out[3] = 0;
         out[4] = 0;
-        out[5] = f;
+        out[5] = y;
         out[6] = 0;
         out[7] = 0;
-        out[8] = 0;
-        out[9] = 0;
-        out[10] = (far + near) * nf;
+        out[8] = a;
+        out[9] = b;
+        out[10] = c;
         out[11] = -1;
         out[12] = 0;
         out[13] = 0;
-        out[14] = (2 * far * near) * nf;
+        out[14] = d;
         out[15] = 0;
         return out;
     }
@@ -831,25 +811,30 @@ namespace Mat4 {
     /**
      * Generates a orthogonal projection matrix with the given bounds
      */
-    export function ortho(out: Mat4, left: number, right: number, bottom: number, top: number, near: number, far: number) {
-        const lr = 1 / (left - right);
-        const bt = 1 / (bottom - top);
-        const nf = 1 / (near - far);
-        out[0] = -2 * lr;
+    export function ortho(out: Mat4, left: number, right: number, top: number, bottom: number, near: number, far: number) {
+        const w = 1.0 / (right - left);
+        const h = 1.0 / (top - bottom);
+        const p = 1.0 / (far - near);
+
+        const x = (right + left) * w;
+        const y = (top + bottom) * h;
+        const z = (far + near) * p;
+
+        out[0] = 2 * w;
         out[1] = 0;
         out[2] = 0;
         out[3] = 0;
         out[4] = 0;
-        out[5] = -2 * bt;
+        out[5] = 2 * h;
         out[6] = 0;
         out[7] = 0;
         out[8] = 0;
         out[9] = 0;
-        out[10] = 2 * nf;
+        out[10] = -2 * p;
         out[11] = 0;
-        out[12] = (left + right) * lr;
-        out[13] = (top + bottom) * bt;
-        out[14] = (far + near) * nf;
+        out[12] = -x;
+        out[13] = -y;
+        out[14] = -z;
         out[15] = 1;
         return out;
     }
@@ -1010,8 +995,8 @@ namespace Mat4 {
     }
 
     const xAxis = Vec3.create(1, 0, 0)
-    const yAxis = Vec3.create(1, 0, 0)
-    const zAxis = Vec3.create(1, 0, 0)
+    const yAxis = Vec3.create(0, 1, 0)
+    const zAxis = Vec3.create(0, 0, 1)
 
     /** Rotation matrix for 90deg around x-axis */
     export const rotX90: ReadonlyMat4 = Mat4.fromRotation(Mat4(), degToRad(90), xAxis)

@@ -56,8 +56,12 @@ This project builds on experience from previous solutions:
 ### Build automatically on file save:
     npm run watch
 
-### With debug mode enabled:
+### Build with debug mode enabled:
     DEBUG=molstar npm run watch
+
+### Build for production:
+    npm run build
+    NODE_ENV=production npm run build-webpack
 
 **Run**
 
@@ -72,18 +76,6 @@ From the root of the project:
     http-server -p PORT-NUMBER
 
 and navigate to `build/viewer`
-
-
-**Run via Docker**
-
-Build the docker image
-
-    docker build -t molstar/proto:httpd .
-
-Run the image
-
-    docker run -d -p 80:80 molstar/proto:httpd
-
 
 
 ### Code generation
@@ -117,6 +109,27 @@ Run the image
     node build/model-server/preprocess -i file.cif -ob file.bcif
 
 To see all available commands, use ``node build/model-server/preprocess -h``.
+
+## Development
+
+### Intallation
+
+If node complains about a missine acorn peer dependency, run the following commands
+
+    npm update acorn --depth 20
+    npm dedupe
+
+If the `gl` package does not compile on node 12 (there are currently no pre-built binaries) revert back to node 10.
+
+### Editor
+
+To get syntax highlighting for the shader files add the following to Visual Code's settings files
+
+    "files.associations": {
+        "*.glsl.ts": "glsl",
+        "*.frag.ts": "glsl",
+        "*.vert.ts": "glsl"
+    },
 
 ## Contributing
 Just open an issue or make a pull request. All contributions are welcome.

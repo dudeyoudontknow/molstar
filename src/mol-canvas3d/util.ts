@@ -4,6 +4,7 @@
  * @author Alexander Rose <alexander.rose@weirdbyte.de>
  */
 
+/** resize canvas to container element */
 export function resizeCanvas (canvas: HTMLCanvasElement, container: Element) {
     let w = window.innerWidth
     let h = window.innerHeight
