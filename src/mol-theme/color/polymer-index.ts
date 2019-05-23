@@ -71,5 +71,5 @@ export const PolymerIndexColorThemeProvider: ColorTheme.Provider<PolymerIndexCol
     factory: PolymerIndexColorTheme,
     getParams: getPolymerIndexColorThemeParams,
     defaultValues: PD.getDefaultValues(PolymerIndexColorThemeParams),
-    isApplicable: (ctx: ThemeDataContext) => !!ctx.structure
+    isApplicable: (ctx: ThemeDataContext) => !!ctx.structure && ctx.structure.polymerResidueCount > 0
 }

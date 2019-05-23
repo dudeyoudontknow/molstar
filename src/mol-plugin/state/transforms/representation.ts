@@ -154,7 +154,7 @@ const StructureRepresentation3D = PluginStateTransform.BuiltIn({
         return ({
             type: PD.Mapped<any>(
                 registry.default.name,
-                registry.types,
+                registry.getApplicableTypes(a.data),
                 name => PD.Group<any>(registry.get(name).getParams(themeCtx, a.data))),
             colorTheme: PD.Mapped<any>(
                 type.defaultColorTheme,
@@ -163,7 +163,7 @@ const StructureRepresentation3D = PluginStateTransform.BuiltIn({
             ),
             sizeTheme: PD.Mapped<any>(
                 type.defaultSizeTheme,
-                themeCtx.sizeThemeRegistry.types,
+                themeCtx.sizeThemeRegistry.getApplicableTypes(dataCtx),
                 name => PD.Group<any>(themeCtx.sizeThemeRegistry.get(name).getParams(dataCtx))
             )
         })
@@ -488,7 +488,7 @@ const VolumeRepresentation3D = PluginStateTransform.BuiltIn({
         return ({
             type: PD.Mapped<any>(
                 registry.default.name,
-                registry.types,
+                registry.getApplicableTypes(a.data),
                 name => PD.Group<any>(registry.get(name).getParams(themeCtx, a.data))),
             colorTheme: PD.Mapped<any>(
                 type.defaultColorTheme,
@@ -497,7 +497,7 @@ const VolumeRepresentation3D = PluginStateTransform.BuiltIn({
             ),
             sizeTheme: PD.Mapped<any>(
                 type.defaultSizeTheme,
-                themeCtx.sizeThemeRegistry.types,
+                themeCtx.sizeThemeRegistry.getApplicableTypes(dataCtx),
                 name => PD.Group<any>(themeCtx.sizeThemeRegistry.get(name).getParams(dataCtx))
             )
         })

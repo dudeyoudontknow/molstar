@@ -54,7 +54,8 @@ export const AssemblySymmetryAxesRepresentationProvider: StructureRepresentation
     getParams: getAssemblySymmetryAxesParams,
     defaultValues: PD.getDefaultValues(AssemblySymmetryAxesParams),
     defaultColorTheme: 'uniform',
-    defaultSizeTheme: 'uniform'
+    defaultSizeTheme: 'uniform',
+    isApplicable: (data: Structure) => !data.isEmpty && !!data.models[0] && !!AssemblySymmetry.get(data.model)
 }
 
 //

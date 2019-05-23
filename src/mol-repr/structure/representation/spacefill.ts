@@ -38,5 +38,6 @@ export const SpacefillRepresentationProvider: StructureRepresentationProvider<Sp
     getParams: getSpacefillParams,
     defaultValues: PD.getDefaultValues(SpacefillParams),
     defaultColorTheme: 'element-symbol',
-    defaultSizeTheme: 'physical'
+    defaultSizeTheme: 'physical',
+    isApplicable: () => true
 }

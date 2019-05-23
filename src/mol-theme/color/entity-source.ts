@@ -139,5 +139,5 @@ export const EntitySourceColorThemeProvider: ColorTheme.Provider<EntitySourceCol
     factory: EntitySourceColorTheme,
     getParams: getEntitySourceColorThemeParams,
     defaultValues: PD.getDefaultValues(EntitySourceColorThemeParams),
-    isApplicable: (ctx: ThemeDataContext) => !!ctx.structure
+    isApplicable: (ctx: ThemeDataContext) => !!ctx.structure && ctx.structure.polymerResidueCount > 0
 }

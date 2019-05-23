@@ -102,5 +102,5 @@ export const PolymerIdColorThemeProvider: ColorTheme.Provider<PolymerIdColorThem
     factory: PolymerIdColorTheme,
     getParams: getPolymerIdColorThemeParams,
     defaultValues: PD.getDefaultValues(PolymerIdColorThemeParams),
-    isApplicable: (ctx: ThemeDataContext) => !!ctx.structure
+    isApplicable: (ctx: ThemeDataContext) => !!ctx.structure && ctx.structure.polymerResidueCount > 0
 }

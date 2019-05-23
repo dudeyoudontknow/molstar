@@ -104,5 +104,5 @@ export const SequenceIdColorThemeProvider: ColorTheme.Provider<SequenceIdColorTh
     factory: SequenceIdColorTheme,
     getParams: getSequenceIdColorThemeParams,
     defaultValues: PD.getDefaultValues(SequenceIdColorThemeParams),
-    isApplicable: (ctx: ThemeDataContext) => !!ctx.structure
+    isApplicable: (ctx: ThemeDataContext) => !!ctx.structure && ctx.structure.polymerResidueCount > 0
 }

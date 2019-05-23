@@ -112,5 +112,5 @@ export const SecondaryStructureColorThemeProvider: ColorTheme.Provider<Secondary
     factory: SecondaryStructureColorTheme,
     getParams: getSecondaryStructureColorThemeParams,
     defaultValues: PD.getDefaultValues(SecondaryStructureColorThemeParams),
-    isApplicable: (ctx: ThemeDataContext) => !!ctx.structure
+    isApplicable: (ctx: ThemeDataContext) => !!ctx.structure && ctx.structure.polymerResidueCount > 0
 }
