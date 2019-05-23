@@ -5,6 +5,7 @@
  * @author Alexander Rose <alexander.rose@weirdbyte.de>
  */
 
+export { MolstarInteractions } from './custom-props/computed/interactions'
 export { MolstarSecondaryStructure } from './custom-props/computed/secondary-structure'
 export { PDBeStructureQualityReport } from './custom-props/pdbe/structure-quality-report'
 export { RCSBAssemblySymmetry } from './custom-props/rcsb/assembly-symmetry'

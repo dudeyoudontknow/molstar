@@ -16,6 +16,18 @@ export function formalCharge(unit: Unit.Atomic, index: StructureElement.UnitInde
     return unit.model.atomicHierarchy.atoms.pdbx_formal_charge.value(unit.elements[index])
 }
 
+export function atomId(unit: Unit.Atomic, index: StructureElement.UnitIndex) {
+    return unit.model.atomicHierarchy.atoms.label_atom_id.value(unit.elements[index])
+}
+
+export function altLoc(unit: Unit.Atomic, index: StructureElement.UnitIndex) {
+    return unit.model.atomicHierarchy.atoms.label_alt_id.value(unit.elements[index])
+}
+
+export function compId(unit: Unit.Atomic, index: StructureElement.UnitIndex) {
+    return unit.model.atomicHierarchy.residues.label_comp_id.value(unit.elements[index])
+}
+
 //
 
 export function interBondCount(structure: Structure, unit: Unit.Atomic, index: StructureElement.UnitIndex): number {
@@ -37,6 +49,16 @@ export function bondToElementCount(structure: Structure, unit: Unit.Atomic, inde
         if (typeSymbol(unit, index) === element) count += 1
     })
     return count
+}
+
+//
+
+export function intraConnectedTo(unit: Unit.Atomic, indexA: StructureElement.UnitIndex, indexB: StructureElement.UnitIndex) {
+    const { offset, b } = unit.links
+    for (let i = offset[indexA], il = offset[indexA + 1]; i < il; ++i) {
+        if (b[i] === indexB) return true
+    }
+    return false
 }
 
 //

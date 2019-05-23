@@ -18,6 +18,14 @@ import { GaussianSurfaceRepresentationProvider } from 'mol-repr/structure/repres
 import { ComputedSecondaryStructure } from 'mol-model-props/computed/secondary-structure';
 import { ComputedValenceModel } from 'mol-model-props/computed/valence-model';
 import { resizeCanvas } from 'mol-canvas3d/util';
+import { ComputedInteractions } from 'mol-model-props/computed/interactions';
+import { Representation } from 'mol-repr/representation';
+import { labelFirst } from 'mol-theme/label';
+import { MarkerAction } from 'mol-geo/geometry/marker-data';
+import { EveryLoci } from 'mol-model/loci';
+import { throttleTime } from 'rxjs/operators';
+import { InteractionsRepresentationProvider } from 'mol-model-props/computed/representations/interactions';
+import { InteractionTypeColorThemeProvider } from 'mol-model-props/computed/themes/interaction-type';
 
 const parent = document.getElementById('app')!
 parent.style.width = '100%'
@@ -30,6 +38,33 @@ resizeCanvas(canvas, parent)
 const canvas3d = Canvas3D.fromCanvas(canvas)
 canvas3d.animate()
 
+const info = document.createElement('div')
+info.style.position = 'absolute'
+info.style.fontFamily = 'sans-serif'
+info.style.fontSize = '24pt'
+info.style.bottom = '20px'
+info.style.right = '20px'
+info.style.color = 'white'
+parent.appendChild(info)
+
+let prevReprLoci = Representation.Loci.Empty
+canvas3d.input.move.pipe(throttleTime(100)).subscribe(({x, y}) => {
+    const pickingId = canvas3d.identify(x, y)
+    let label = ''
+    if (pickingId) {
+        const reprLoci = canvas3d.getLoci(pickingId)
+        label = labelFirst(reprLoci.loci)
+        if (!Representation.Loci.areEqual(prevReprLoci, reprLoci)) {
+            canvas3d.mark(prevReprLoci, MarkerAction.RemoveHighlight)
+            canvas3d.mark(reprLoci, MarkerAction.Highlight)
+            prevReprLoci = reprLoci
+        }
+    } else {
+        canvas3d.mark({ loci: EveryLoci }, MarkerAction.RemoveHighlight)
+        prevReprLoci = Representation.Loci.Empty
+    }
+    info.innerText = label
+})
 
 async function parseCif(data: string|Uint8Array) {
     const comp = CIF.parse(data);
@@ -58,11 +93,17 @@ async function getStructure(model: Model) {
 }
 
 const reprCtx = {
+    webgl: canvas3d.webgl,
     colorThemeRegistry: ColorTheme.createRegistry(),
     sizeThemeRegistry: SizeTheme.createRegistry()
 }
+
 function getCartoonRepr() {
     return CartoonRepresentationProvider.factory(reprCtx, CartoonRepresentationProvider.getParams)
+}
+
+function getInteractionRepr() {
+    return InteractionsRepresentationProvider.factory(reprCtx, InteractionsRepresentationProvider.getParams)
 }
 
 function getBallAndStickRepr() {
@@ -78,7 +119,7 @@ function getGaussianSurfaceRepr() {
 }
 
 async function init() {
-    const cif = await downloadFromPdb('1blu')
+    const cif = await downloadFromPdb('1crn')
     const models = await getModels(cif)
     const structure = await getStructure(models[0])
     console.time('computeDSSP')
@@ -90,30 +131,45 @@ async function init() {
     console.timeEnd('computeValenceModel');
     console.log(ComputedValenceModel.get(structure))
 
+    console.time('computeInteractions')
+    await ComputedInteractions.attachFromCifOrCompute(structure)
+    console.timeEnd('computeInteractions');
+    console.log(ComputedInteractions.get(structure))
+
     const show = {
         cartoon: true,
-        ballAndStick: false,
+        interaction: true,
+        ballAndStick: true,
         molecularSurface: false,
         gaussianSurface: false,
     }
 
     const cartoonRepr = getCartoonRepr()
+    const interactionRepr = getInteractionRepr()
     const ballAndStickRepr = getBallAndStickRepr()
     const molecularSurfaceRepr = getMolecularSurfaceRepr()
     const gaussianSurfaceRepr = getGaussianSurfaceRepr()
 
     if (show.cartoon) {
         cartoonRepr.setTheme({
-            color: reprCtx.colorThemeRegistry.create('secondary-structure', { structure }),
+            color: reprCtx.colorThemeRegistry.create('element-symbol', { structure }),
             size: reprCtx.sizeThemeRegistry.create('uniform', { structure })
         })
         await cartoonRepr.createOrUpdate({ ...CartoonRepresentationProvider.defaultValues, quality: 'auto' }, structure).run()
     }
 
+    if (show.interaction) {
+        interactionRepr.setTheme({
+            color: InteractionTypeColorThemeProvider.factory({ structure }, {}),
+            size: reprCtx.sizeThemeRegistry.create('uniform', { structure })
+        })
+        await interactionRepr.createOrUpdate({ ...InteractionsRepresentationProvider.defaultValues, quality: 'auto' }, structure).run()
+    }
+
     if (show.ballAndStick) {
         ballAndStickRepr.setTheme({
-            color: reprCtx.colorThemeRegistry.create('secondary-structure', { structure }),
-            size: reprCtx.sizeThemeRegistry.create('uniform', { structure })
+            color: reprCtx.colorThemeRegistry.create('element-symbol', { structure }),
+            size: reprCtx.sizeThemeRegistry.create('uniform', { structure }, { value: 0.3 })
         })
         await ballAndStickRepr.createOrUpdate({ ...BallAndStickRepresentationProvider.defaultValues, quality: 'auto' }, structure).run()
     }
@@ -139,6 +195,7 @@ async function init() {
     }
 
     if (show.cartoon) canvas3d.add(cartoonRepr)
+    if (show.interaction) canvas3d.add(interactionRepr)
     if (show.ballAndStick) canvas3d.add(ballAndStickRepr)
     if (show.molecularSurface) canvas3d.add(molecularSurfaceRepr)
     if (show.gaussianSurface) canvas3d.add(gaussianSurfaceRepr)

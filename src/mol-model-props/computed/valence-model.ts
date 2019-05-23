@@ -14,6 +14,7 @@ const nextValenceModelId = idFactory()
 export namespace ComputedValenceModel {
     export type Property = {
         id: number
+        /** maps unit.id to valenceModel data */
         map: Map<number, ValenceModel>
     }
 
