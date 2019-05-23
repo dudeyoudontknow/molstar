@@ -35,7 +35,8 @@ export function getGapRanges(unit: Unit): SortedRanges<ElementIndex> {
 }
 
 export namespace PolymerLocationIterator {
-    export function fromGroup(group: Unit.SymmetryGroup): LocationIterator {
+    export function fromGroup(structureGroup: StructureGroup): LocationIterator {
+        const { group } = structureGroup
         const polymerElements = group.units[0].polymerElements
         const groupCount = polymerElements.length
         const instanceCount = group.units.length
@@ -51,7 +52,8 @@ export namespace PolymerLocationIterator {
 }
 
 export namespace PolymerGapLocationIterator {
-    export function fromGroup(group: Unit.SymmetryGroup): LocationIterator {
+    export function fromGroup(structureGroup: StructureGroup): LocationIterator {
+        const { group } = structureGroup
         const gapElements = group.units[0].gapElements
         const groupCount = gapElements.length
         const instanceCount = group.units.length

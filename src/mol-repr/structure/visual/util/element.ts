@@ -104,7 +104,8 @@ export function getElementLoci(pickingId: PickingId, structureGroup: StructureGr
 }
 
 export namespace StructureElementIterator {
-    export function fromGroup(group: Unit.SymmetryGroup): LocationIterator {
+    export function fromGroup(structureGroup: StructureGroup): LocationIterator {
+        const { group } = structureGroup
         const groupCount = group.elements.length
         const instanceCount = group.units.length
         const location = StructureElement.create()
