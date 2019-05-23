@@ -67,7 +67,7 @@ export function explicitValence (structure: Structure, unit: Unit.Atomic, index:
     const { offset, edgeProps } = unit.links
     for (let i = offset[index], il = offset[index + 1]; i < il; ++i) v += edgeProps.order[i]
     // inter-unit bonds
-    structure.interUnitLinks.getBondIndices(index, unit).forEach(b => v += structure.interUnitLinks.bonds[b].order)
+    structure.interUnitLinks.getEdgeIndices(index, unit).forEach(b => v += structure.interUnitLinks.edges[b].props.order)
     return v
 }
 
@@ -268,8 +268,8 @@ export function calculateHydrogensCharge (structure: Structure, unit: Unit.Atomi
             }
             break
 
-        default:
-            console.warn('Requested charge, protonation for an unhandled element', element)
+        // default:
+        //     console.warn('Requested charge, protonation for an unhandled element', element)
     }
 
     return [ charge, implicitHCount, implicitHCount + hydrogenCount, geom ]

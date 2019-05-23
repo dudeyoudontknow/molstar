@@ -71,7 +71,7 @@ class Structure {
     /** Count of all links (intra- and inter-unit) in the structure */
     get linkCount() {
         if (!this._props.linkCount) {
-            this._props.linkCount = this.interUnitLinks.bondCount + Link.getIntraUnitLinkCount(this)
+            this._props.linkCount = this.interUnitLinks.edgeCount + Link.getIntraUnitLinkCount(this)
         }
         return this._props.linkCount;
     }

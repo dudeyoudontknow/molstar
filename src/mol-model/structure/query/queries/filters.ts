@@ -272,7 +272,7 @@ function checkConnected(ctx: IsConnectedToCtx, structure: Structure) {
                 tElement.unit = lu.unitB;
                 queryCtx.atomicLink.bUnit = lu.unitB;
                 const bElements = lu.unitB.elements;
-                const bonds = lu.getBonds(inputIndex);
+                const bonds = lu.getEdges(inputIndex);
                 for (let bi = 0, _bi = bonds.length; bi < _bi; bi++) {
                     const bond = bonds[bi];
                     tElement.element = bElements[bond.indexB];

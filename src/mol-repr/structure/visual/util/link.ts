@@ -140,11 +140,11 @@ export namespace LinkIterator {
     }
 
     export function fromStructure(structure: Structure): LocationIterator {
-        const groupCount = structure.interUnitLinks.bondCount
+        const groupCount = structure.interUnitLinks.edgeCount
         const instanceCount = 1
         const location = Link.Location()
         const getLocation = (groupIndex: number) => {
-            const bond = structure.interUnitLinks.bonds[groupIndex]
+            const bond = structure.interUnitLinks.edges[groupIndex]
             location.aUnit = bond.unitA
             location.aIndex = bond.indexA
             location.bUnit = bond.unitB

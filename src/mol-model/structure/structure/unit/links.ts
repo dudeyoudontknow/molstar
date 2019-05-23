@@ -70,7 +70,7 @@ namespace Link {
             return LinkType.create(links.edgeProps.flags[idx]);
         } else {
             const bond = structure.interUnitLinks.getBondFromLocation(link);
-            if (bond) return LinkType.create(bond.flag);
+            if (bond) return LinkType.create(bond.props.flag);
             return LinkType.create(LinkType.Flag.None);
         }
     }
@@ -83,7 +83,7 @@ namespace Link {
             return links.edgeProps.order[idx];
         } else {
             const bond = structure.interUnitLinks.getBondFromLocation(link);
-            if (bond) return bond.order;
+            if (bond) return bond.props.order;
             return 0;
         }
     }
@@ -129,7 +129,7 @@ namespace Link {
             this.unit = unit
             this.index = index
 
-            this.interBondIndices = structure.interUnitLinks.getBondIndices(index, unit)
+            this.interBondIndices = structure.interUnitLinks.getEdgeIndices(index, unit)
             this.interBondCount = this.interBondIndices.length
             this.interBondIndex = 0
 
@@ -147,11 +147,11 @@ namespace Link {
                 this.current.order = this.unit.links.edgeProps.order[this.intraBondIndex]
                 this.intraBondIndex += 1
             } else if (this.interBondIndex < this.interBondCount) {
-                const b = this.structure.interUnitLinks.bonds[this.interBondIndex]
+                const b = this.structure.interUnitLinks.edges[this.interBondIndex]
                 this.current.otherUnit = b.unitA !== this.unit ? b.unitA : b.unitB
                 this.current.otherIndex = b.indexA !== this.index ? b.indexA : b.indexB
-                this.current.type = b.flag
-                this.current.order = b.order
+                this.current.type = b.props.flag
+                this.current.order = b.props.order
                 this.interBondIndex += 1
             } else {
                 this.hasNext = false
