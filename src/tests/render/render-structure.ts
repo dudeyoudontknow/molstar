@@ -4,9 +4,10 @@
  * @author Alexander Rose <alexander.rose@weirdbyte.de>
  */
 
-import fs = require('fs')
-import { PNG } from 'pngjs'
-import createContext = require('gl')
+import fs = require('fs');
+import { TextEncoder } from 'util';
+import { PNG } from 'pngjs';
+import createContext = require('gl');
 import { Canvas3D, Canvas3DParams } from '../../mol-canvas3d/canvas3d';
 import InputObserver from '../../mol-util/input/input-observer';
 import { ColorNames } from '../../mol-util/color/tables';
@@ -48,22 +49,30 @@ const canvas3d = Canvas3D.create(gl, input, {
 canvas3d.animate()
 
 
+async function parseCif(data: string|Uint8Array) {
+    const comp = CIF.parse(data);
+    const parsed = await comp.run();
+    if (parsed.isError) throw parsed;
+    return parsed.result;
+}
+
+async function downloadCif(url: string, isBinary: boolean) {
+    const data = await fetch(url);
+    return parseCif(isBinary ? new Uint8Array(await data.arrayBuffer()) : await data.text());
+}
+
+async function downloadFromPdb(pdb: string) {
+    // const parsed = await downloadCif(`https://files.rcsb.org/download/${pdb}.cif`, false);
+    const parsed = await downloadCif(`https://webchem.ncbr.muni.cz/ModelServer/static/bcif/${pdb}`, true);
+    return parsed.blocks[0];
+}
+
 async function getModels(frame: CifFrame) {
     return await trajectoryFromMmCIF(frame).run();
 }
 
 async function getStructure(model: Model) {
     return Structure.ofModel(model);
-}
-
-async function parseCif(data: string|Uint8Array) {
-    
-    const comp = CIF.parse(data);
-    const parsed = await comp.run();
-    console.log('\n\n\n' + parsed + '\n\n\n')
-    if (parsed.isError) throw parsed;
-    console.log('after?');
-    return parsed.result;
 }
 
 const reprCtx = {
@@ -74,14 +83,18 @@ function getCartoonRepr() {
     return CartoonRepresentationProvider.factory(reprCtx, CartoonRepresentationProvider.getParams)
 }
 
+
 async function init() {
-    fs.readFile(`../../../examples/1crn.cif`, async function(err, data) {
+
+    fs.readFile(`../../../examples/1crn.cif`, 'utf8', async function(err, data) {
         if (err) throw err
         try {
             // const comp = CIF.parse(data);
             // const parsed = await comp.run();
             // if (parsed.isError) throw parsed; //  <<========= Error occurs
-            const parsed = await parseCif(data);
+            const dataArray = new TextEncoder().encode(data);
+            const param = (true ? new Uint8Array(await dataArray) : await data);
+            const parsed = await parseCif(param);
             const cif = parsed.blocks[0]
             const models = await getModels(cif as CifFrame);
             const structure = await getStructure(models[0])
@@ -101,8 +114,6 @@ async function init() {
         }
     });
 
-    // canvas3d.setProps({ trackball: { ...canvas3d.props.trackball, spin: true } })
-
     setTimeout(() => {
         const pixelData = canvas3d.getPixelData('color')
         const png = new PNG({ width, height })
@@ -111,6 +122,7 @@ async function init() {
             process.exit()
         })
     }, 500)
+
 }
 
 init()
