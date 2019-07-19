@@ -4,22 +4,23 @@
  * @author Alexander Rose <alexander.rose@weirdbyte.de>
  */
 
+import * as argparse from 'argparse'
+import createContext = require('gl')
 import fs = require('fs')
 import { PNG } from 'pngjs'
-import createContext = require('gl')
 import { Canvas3D, Canvas3DParams } from '../../mol-canvas3d/canvas3d';
 import InputObserver from '../../mol-util/input/input-observer';
-import { ColorNames } from '../../mol-util/color/tables';
-import { CIF, CifFrame } from '../../mol-io/reader/cif'
-import { Model, Structure } from '../../mol-model/structure';
 import { ColorTheme } from '../../mol-theme/color';
 import { SizeTheme } from '../../mol-theme/size';
 import { CartoonRepresentationProvider } from '../../mol-repr/structure/representation/cartoon';
+import { CifFrame } from '../../mol-io/reader/cif'
 import { trajectoryFromMmCIF } from '../../mol-model-formats/structure/mmcif';
-import { ComputedSecondaryStructure } from '../../mol-model-props/computed/secondary-structure';
+import { Model, Structure } from '../../mol-model/structure';
+import { ColorNames } from '../../mol-util/color/tables';
+import { readCifFile } from '../../apps/structure-info/model';
 
-const width = 2048
-const height = 1536
+const width = 320
+const height = 320
 const gl = createContext(width, height, {
     alpha: false,
     antialias: true,
@@ -47,6 +48,14 @@ const canvas3d = Canvas3D.create(gl, input, {
 })
 canvas3d.animate()
 
+const reprCtx = {
+    wegbl: canvas3d.webgl,
+    colorThemeRegistry: ColorTheme.createRegistry(),
+    sizeThemeRegistry: SizeTheme.createRegistry()
+}
+function getCartoonRepr() {
+    return CartoonRepresentationProvider.factory(reprCtx, CartoonRepresentationProvider.getParams)
+}
 
 async function getModels(frame: CifFrame) {
     return await trajectoryFromMmCIF(frame).run();
@@ -56,61 +65,53 @@ async function getStructure(model: Model) {
     return Structure.ofModel(model);
 }
 
-async function parseCif(data: string|Uint8Array) {
-    
-    const comp = CIF.parse(data);
-    const parsed = await comp.run();
-    console.log('\n\n\n' + parsed + '\n\n\n')
-    if (parsed.isError) throw parsed;
-    console.log('after?');
-    return parsed.result;
-}
+async function run() {
+    try {
+        const cif = await readCifFile('../../../examples/1crn.cif')
+        const models = await getModels(cif as CifFrame)
+        const structure = await getStructure(models[0])
 
-const reprCtx = {
-    colorThemeRegistry: ColorTheme.createRegistry(),
-    sizeThemeRegistry: SizeTheme.createRegistry()
-}
-function getCartoonRepr() {
-    return CartoonRepresentationProvider.factory(reprCtx, CartoonRepresentationProvider.getParams)
-}
+        const cartoonRepr = getCartoonRepr()
+        cartoonRepr.setTheme({
+            color: reprCtx.colorThemeRegistry.create('sequence-id', { structure }),
+            size: reprCtx.sizeThemeRegistry.create('uniform', { structure })
+        })
+        await cartoonRepr.createOrUpdate({ ...CartoonRepresentationProvider.defaultValues, quality: 'auto' }, structure).run()
 
-async function init() {
-    fs.readFile(`../../../examples/1crn.cif`, async function(err, data) {
-        if (err) throw err
-        try {
-            // const comp = CIF.parse(data);
-            // const parsed = await comp.run();
-            // if (parsed.isError) throw parsed; //  <<========= Error occurs
-            const parsed = await parseCif(data);
-            const cif = parsed.blocks[0]
-            const models = await getModels(cif as CifFrame);
-            const structure = await getStructure(models[0])
-
-            const cartoonRepr = getCartoonRepr()
-            cartoonRepr.setTheme({
-                color: reprCtx.colorThemeRegistry.create('sequence-id', { structure }),
-                size: reprCtx.sizeThemeRegistry.create('uniform', { structure })
-            })
-            await cartoonRepr.createOrUpdate({ ...CartoonRepresentationProvider.defaultValues, quality: 'auto' }, structure).run()
-
-            canvas3d.add(cartoonRepr)
-            canvas3d.resetCamera()
-        } catch (e) {
-            console.error(e)
-            process.exit(1)
-        }
-    });
-
-    // canvas3d.setProps({ trackball: { ...canvas3d.props.trackball, spin: true } })
+        canvas3d.add(cartoonRepr)
+        canvas3d.resetCamera()
+    } catch (e) {
+        console.error(e)
+        process.exit(1)
+    }
 
     setTimeout(() => {
         const pixelData = canvas3d.getPixelData('color')
         const png = new PNG({ width, height })
         png.data = Buffer.from(pixelData.array)
-        png.pack().pipe(fs.createWriteStream('output.png')).on('finish', () => {
+        png.pack().pipe(fs.createWriteStream('output2.png')).on('finish', () => {
             process.exit()
         })
     }, 500)
 }
 
-init()
+//
+
+// const parser = new argparse.ArgumentParser({
+//     addHelp: true,
+//     description: 'render image as PNG (work in progress)'
+// });
+// parser.addArgument([ 'id' ], {
+//     help: 'PDB ID'
+// });
+// parser.addArgument([ 'out' ], {
+//     help: 'image output path'
+// });
+
+// interface Args {
+//     id: string
+//     out: string
+// }
+// const args: Args = parser.parseArgs();
+
+run()
